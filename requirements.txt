@@ -1,0 +1,80 @@
+# Hockey Music Controller - Requirements
+# 
+# IMPORTANT: This application requires tkinter, which is NOT available via pip
+# on macOS. Tkinter must come with your Python installation.
+#
+# ============================================================================
+# TKINTER INSTALLATION - macOS
+# ============================================================================
+#
+# If you get "tkinter not available" error, follow these steps:
+#
+# OPTION 1: Install Python from python.org (RECOMMENDED)
+# -------------------------------------------------------
+# 1. Download Python 3 from: https://www.python.org/downloads/
+# 2. Run the official installer (includes tkinter by default)
+# 3. After installation, use: python3 hockey_music_controller.py
+#
+# OPTION 2: If using Homebrew Python
+# -----------------------------------
+# Homebrew Python often has tkinter issues. Install tcl-tk:
+#
+#   brew install python-tk@3.11
+#   # (adjust version number to match your Python version)
+#
+# Or switch to python.org Python (recommended)
+#
+# OPTION 3: System Python (usually works)
+# ----------------------------------------
+# macOS comes with Python 3, which usually includes tkinter:
+#
+#   /usr/bin/python3 hockey_music_controller.py
+#
+# ============================================================================
+# VERIFY TKINTER IS AVAILABLE
+# ============================================================================
+#
+# Run this command to check:
+#   python3 -c "import tkinter; print('✅ Tkinter is available')"
+#
+# If you see an error, tkinter is not installed with your Python.
+#
+# ============================================================================
+# DEPENDENCIES
+# ============================================================================
+#
+# Standard library modules (no pip install needed):
+# - tkinter      - GUI framework (must come with Python install)
+# - subprocess   - Running AppleScript commands
+# - json         - Configuration file handling
+# - os           - File system operations
+# - random       - Playlist shuffling
+#
+# No external pip packages required!
+#
+# ============================================================================
+# TROUBLESHOOTING
+# ============================================================================
+#
+# Error: "No module named '_tkinter'"
+# Solution: Reinstall Python from python.org
+#
+# Error: "Python is not installed as a framework"
+# Solution: Use python.org installer, not homebrew
+#
+# Error: "wish not found"
+# Solution: Install tcl-tk via homebrew or use python.org Python
+#
+# ============================================================================
+# QUICK START
+# ============================================================================
+#
+# 1. Ensure tkinter is available:
+#    python3 -c "import tkinter"
+#
+# 2. Run the application:
+#    python3 hockey_music_controller.py
+#
+# 3. If step 1 fails, reinstall Python from python.org
+#
+# ============================================================================

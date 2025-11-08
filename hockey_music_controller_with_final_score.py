@@ -9,6 +9,24 @@ import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 import json
 import os
+import random
+import base64
+import tempfile
+
+# Try to import Hume AI SDK
+try:
+    from hume import HumeClient
+    from hume.tts import PostedUtterance, PostedUtteranceVoiceWithName
+    from dotenv import load_dotenv
+    load_dotenv()
+    HUME_AVAILABLE = True
+    HUME_API_KEY = os.getenv('HUME_API_KEY')
+    # Hardcoded custom voice ID
+    HUME_VOICE_ID = "Hockey Goal Announcer"
+except ImportError:
+    HUME_AVAILABLE = False
+    HUME_API_KEY = None
+    HUME_VOICE_ID = None
 
 class AppleMusicController:
     """Interface to control Apple Music via AppleScript"""
@@ -171,6 +189,223 @@ class AppleMusicController:
         end tell
         '''
         return self.run_applescript(script)[1]
+    
+    @staticmethod
+    def generate_goal_announcement(team, scorer, assist1=None, assist2=None, voice="Alex", use_hume=True):
+        """Generate and play goal announcement using Hume.ai or macOS text-to-speech"""
+        # Build announcement text
+        if team.lower() == "home":
+            announcement = f"Patriots goal! Scored by number {scorer}"
+        else:
+            announcement = f"Goal scored by number {scorer}"
+        
+        # Add assists
+        assists = [a for a in [assist1, assist2] if a and a.strip()]
+        if len(assists) == 2:
+            announcement += f", assisted by {assists[0]} and {assists[1]}"
+        elif len(assists) == 1:
+            announcement += f", assisted by {assists[0]}"
+        else:
+            announcement += " unassisted."
+        
+        # Try Hume.ai first if available and enabled
+        if use_hume and HUME_AVAILABLE and HUME_API_KEY:
+            try:
+                client = HumeClient(api_key=HUME_API_KEY)
+                
+                # Use custom voice if specified, otherwise use a default Hume voice 
+                if HUME_VOICE_ID:
+                    # For custom voices, specify provider='CUSTOM_VOICE'
+                    print(f"Attempting Hume TTS with custom voice: {HUME_VOICE_ID}")
+                    utterance = PostedUtterance(
+                        text=announcement,
+                        voice=PostedUtteranceVoiceWithName(
+                            name=HUME_VOICE_ID,
+                            provider='CUSTOM_VOICE'
+                        )
+                    )
+                else:
+                    # Use Hume's default voice library
+                    print("Attempting Hume TTS with default voice: Ava Song")
+                    utterance = PostedUtterance(
+                        text=announcement,
+                        voice=PostedUtteranceVoiceWithName(
+                            name='Ava Song',
+                            provider='HUME_AI'
+                        )
+                    )
+                
+                # Synthesize speech
+                result = client.tts.synthesize_json(utterances=[utterance])
+                
+                # Decode base64 audio and play it
+                if result and result.generations and len(result.generations) > 0:
+                    audio_base64 = result.generations[0].audio
+                    audio_bytes = base64.b64decode(audio_base64)
+                    
+                    # Write to temporary file and play
+                    with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_audio:
+                        temp_audio.write(audio_bytes)
+                        temp_audio_path = temp_audio.name
+                    
+                    # Play audio using afplay (macOS)
+                    subprocess.run(['afplay', temp_audio_path])
+                    
+                    # Clean up temp file
+                    try:
+                        os.unlink(temp_audio_path)
+                    except:
+                        pass
+                    
+                    print("✓ Hume TTS successful!")
+                    return announcement
+            except Exception as e:
+                print(f"Hume.ai TTS error: {e}")
+                
+                # If custom voice failed, try default Ava Song as fallback
+                if HUME_VOICE_ID:
+                    try:
+                        print("Trying fallback to Ava Song...")
+                        client = HumeClient(api_key=HUME_API_KEY)
+                        utterance = PostedUtterance(
+                            text=announcement,
+                            voice=PostedUtteranceVoiceWithName(
+                                name='Ava Song',
+                                provider='HUME_AI'
+                            )
+                        )
+                        result = client.tts.synthesize_json(utterances=[utterance])
+                        
+                        if result and result.generations and len(result.generations) > 0:
+                            audio_base64 = result.generations[0].audio
+                            audio_bytes = base64.b64decode(audio_base64)
+                            
+                            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_audio:
+                                temp_audio.write(audio_bytes)
+                                temp_audio_path = temp_audio.name
+                            
+                            subprocess.run(['afplay', temp_audio_path])
+                            
+                            try:
+                                os.unlink(temp_audio_path)
+                            except:
+                                pass
+                            
+                            print("✓ Fallback to Ava Song successful!")
+                            return announcement
+                    except Exception as e2:
+                        print(f"Ava Song fallback also failed: {e2}")
+                
+                print("Falling back to macOS voice...")
+        
+        # Fallback to macOS 'say' command
+        # Use a deeper voice for PA effect
+        subprocess.run(['say', '-v', voice, '-r', '180', announcement])
+        
+        return announcement
+
+    @staticmethod
+    def generate_final_score_announcement(home_score, visiting_team, visiting_score, voice="Alex", use_hume=True):
+        """Generate and play final score announcement using Hume.ai or macOS text-to-speech"""
+        # Build announcement text
+        announcement = f"Final score: Patriots {home_score}, {visiting_team} {visiting_score}"
+        
+        # Try Hume.ai first if available and enabled
+        if use_hume and HUME_AVAILABLE and HUME_API_KEY:
+            try:
+                client = HumeClient(api_key=HUME_API_KEY)
+                
+                # Use custom voice if specified, otherwise use a default Hume voice 
+                if HUME_VOICE_ID:
+                    # For custom voices, specify provider='CUSTOM_VOICE'
+                    print(f"Attempting Hume TTS with custom voice: {HUME_VOICE_ID}")
+                    utterance = PostedUtterance(
+                        text=announcement,
+                        voice=PostedUtteranceVoiceWithName(
+                            name=HUME_VOICE_ID,
+                            provider='CUSTOM_VOICE'
+                        )
+                    )
+                else:
+                    # Use Hume's default voice library
+                    print("Attempting Hume TTS with default voice: Ava Song")
+                    utterance = PostedUtterance(
+                        text=announcement,
+                        voice=PostedUtteranceVoiceWithName(
+                            name='Ava Song',
+                            provider='HUME_AI'
+                        )
+                    )
+                
+                # Synthesize speech
+                result = client.tts.synthesize_json(utterances=[utterance])
+                
+                # Decode base64 audio and play it
+                if result and result.generations and len(result.generations) > 0:
+                    audio_base64 = result.generations[0].audio
+                    audio_bytes = base64.b64decode(audio_base64)
+                    
+                    # Write to temporary file and play
+                    with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_audio:
+                        temp_audio.write(audio_bytes)
+                        temp_audio_path = temp_audio.name
+                    
+                    # Play audio using afplay (macOS)
+                    subprocess.run(['afplay', temp_audio_path])
+                    
+                    # Clean up temp file
+                    try:
+                        os.unlink(temp_audio_path)
+                    except:
+                        pass
+                    
+                    print("✓ Hume TTS successful!")
+                    return announcement
+            except Exception as e:
+                print(f"Hume.ai TTS error: {e}")
+                
+                # If custom voice failed, try default Ava Song as fallback
+                if HUME_VOICE_ID:
+                    try:
+                        print("Trying fallback to Ava Song...")
+                        client = HumeClient(api_key=HUME_API_KEY)
+                        utterance = PostedUtterance(
+                            text=announcement,
+                            voice=PostedUtteranceVoiceWithName(
+                                name='Ava Song',
+                                provider='HUME_AI'
+                            )
+                        )
+                        result = client.tts.synthesize_json(utterances=[utterance])
+                        
+                        if result and result.generations and len(result.generations) > 0:
+                            audio_base64 = result.generations[0].audio
+                            audio_bytes = base64.b64decode(audio_base64)
+                            
+                            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_audio:
+                                temp_audio.write(audio_bytes)
+                                temp_audio_path = temp_audio.name
+                            
+                            subprocess.run(['afplay', temp_audio_path])
+                            
+                            try:
+                                os.unlink(temp_audio_path)
+                            except:
+                                pass
+                            
+                            print("✓ Fallback to Ava Song successful!")
+                            return announcement
+                    except Exception as e2:
+                        print(f"Ava Song fallback also failed: {e2}")
+                
+                print("Falling back to macOS voice...")
+        
+        # Fallback to macOS 'say' command
+        # Use a deeper voice for PA effect
+        subprocess.run(['say', '-v', voice, '-r', '180', announcement])
+        
+        return announcement
+
 
 
 class HockeyMusicGUI:
@@ -351,7 +586,42 @@ class HockeyMusicGUI:
         )
         self.penalty_kill_btn.pack(side=tk.LEFT, padx=5, expand=True, fill=tk.X)
         
+        # PA Announcement button frame
+        pa_frame = ttk.Frame(control_frame)
+        pa_frame.pack(fill=tk.X, pady=(5, 10))
+        
+        self.pa_announce_btn = tk.Button(
+            pa_frame,
+            text="📢 PA Goal Announcement",
+            command=self.open_pa_announcement_window,
+            font=('Arial', 12, 'bold'),
+            bg='#FFA500',
+            fg='white',
+            height=1,
+            relief=tk.RAISED,
+            bd=4
+        )
+        self.pa_announce_btn.pack(fill=tk.X, padx=5)
+        
         # Playback controls
+        # Final Score button frame
+        final_score_frame = ttk.Frame(control_frame)
+        final_score_frame.pack(fill=tk.X, pady=(5, 10))
+        
+        self.final_score_btn = tk.Button(
+            final_score_frame,
+            text="🏁 Final Score Announcement",
+            command=self.open_final_score_window,
+            font=('Arial', 12, 'bold'),
+            bg='#9B59B6',
+            fg='white',
+            height=1,
+            relief=tk.RAISED,
+            bd=4
+        )
+        self.final_score_btn.pack(fill=tk.X, padx=5)
+        
+
         playback_frame = ttk.Frame(control_frame)
         playback_frame.pack(fill=tk.X, pady=5)
         
@@ -451,6 +721,374 @@ class HockeyMusicGUI:
         # Start updating current track display now that all UI elements exist
         self.update_current_track()
     
+    def open_pa_announcement_window(self):
+        """Open PA announcement configuration window"""
+        pa_window = tk.Toplevel(self.root)
+        pa_window.title("PA Goal Announcement")
+        pa_window.geometry("450x450")
+        pa_window.transient(self.root)
+        pa_window.grab_set()
+        
+        # Main frame with scrollbar support
+        main_frame = ttk.Frame(pa_window, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Title with Hume status
+        if HUME_AVAILABLE and HUME_API_KEY:
+            title_text = "📢 Goal Announcement (Hume.ai Enabled)"
+            title_color = 'green'
+        else:
+            title_text = "📢 Goal Announcement (macOS Voices)"
+            title_color = 'orange'
+        
+        title_label = ttk.Label(
+            main_frame,
+            text=title_text,
+            font=('Arial', 14, 'bold'),
+            foreground=title_color
+        )
+        title_label.grid(row=0, column=0, columnspan=3, pady=(0, 15))
+        
+        # Team selection
+        ttk.Label(main_frame, text="Team:", font=('Arial', 11, 'bold')).grid(row=1, column=0, sticky=tk.W, pady=5)
+        
+        team_var = tk.StringVar(value="home")
+        team_frame = ttk.Frame(main_frame)
+        team_frame.grid(row=1, column=1, columnspan=2, sticky=tk.W, pady=5)
+        home_radio = ttk.Radiobutton(team_frame, text="Home (Patriots)", variable=team_var, value="home")
+        home_radio.pack(side=tk.LEFT, padx=5)
+        away_radio = ttk.Radiobutton(team_frame, text="Away", variable=team_var, value="away")
+        away_radio.pack(side=tk.LEFT, padx=5)
+        
+        # Scorer input
+        ttk.Label(main_frame, text="Goal Scored By #:", font=('Arial', 11)).grid(row=2, column=0, sticky=tk.W, pady=10)
+        scorer_entry = ttk.Entry(main_frame, width=15, font=('Arial', 12))
+        scorer_entry.grid(row=2, column=1, sticky=tk.W, pady=10)
+        scorer_entry.focus()
+        
+        # Assist 1 input
+        ttk.Label(main_frame, text="Assisted By #:", font=('Arial', 11)).grid(row=3, column=0, sticky=tk.W, pady=10)
+        assist1_entry = ttk.Entry(main_frame, width=15, font=('Arial', 12))
+        assist1_entry.grid(row=3, column=1, sticky=tk.W, pady=10)
+        ttk.Label(main_frame, text="(optional)", font=('Arial', 9, 'italic')).grid(row=3, column=2, sticky=tk.W, padx=5)
+        
+        # Assist 2 input
+        ttk.Label(main_frame, text="2nd Assist #:", font=('Arial', 11)).grid(row=4, column=0, sticky=tk.W, pady=10)
+        assist2_entry = ttk.Entry(main_frame, width=15, font=('Arial', 12))
+        assist2_entry.grid(row=4, column=1, sticky=tk.W, pady=10)
+        ttk.Label(main_frame, text="(optional)", font=('Arial', 9, 'italic')).grid(row=4, column=2, sticky=tk.W, padx=5)
+        
+        # Voice selection (only show if not using Hume)
+        if not (HUME_AVAILABLE and HUME_API_KEY):
+            ttk.Label(main_frame, text="Voice:", font=('Arial', 11)).grid(row=5, column=0, sticky=tk.W, pady=10)
+            voice_var = tk.StringVar(value="Alex")
+            voice_combo = ttk.Combobox(main_frame, textvariable=voice_var, width=20, state='readonly')
+            # Premium voices (some may need to be downloaded in System Preferences)
+            voice_combo['values'] = (
+                'Alex',           # US Male - Clear
+                'Daniel',         # UK Male - Deep
+                'Samantha',       # US Female
+                'Karen',          # Australian Female
+                'Moira',          # Irish Female
+                'Tessa',          # South African Female
+                'Rishi',          # Indian Male
+                'Veena'           # Indian Female
+            )
+            voice_combo.grid(row=5, column=1, sticky=tk.W, pady=10)
+            ttk.Label(main_frame, text="(Alex recommended)", font=('Arial', 9, 'italic')).grid(row=5, column=2, sticky=tk.W, padx=5)
+            
+            # Voice download hint
+            voice_hint = ttk.Label(
+                main_frame, 
+                text="💡 Tip: Download 'Enhanced' voices in System Settings → Accessibility → Spoken Content",
+                font=('Arial', 8),
+                foreground='blue',
+                wraplength=380
+            )
+            voice_hint.grid(row=5, column=0, columnspan=3, sticky=tk.W, pady=(35, 0))
+            preview_row = 6
+        else:
+            # Show Hume.ai info
+            voice_var = tk.StringVar(value="Hume")
+            hume_info = ttk.Label(
+                main_frame,
+                text="✅ Using Hume.ai professional voice" + (f"\n(Voice ID: {HUME_VOICE_ID[:20]}...)" if HUME_VOICE_ID else "\n(Auto-selected voice)"),
+                font=('Arial', 10),
+                foreground='green'
+            )
+            hume_info.grid(row=5, column=0, columnspan=3, pady=10)
+            preview_row = 6
+        
+        # Preview section
+        ttk.Label(main_frame, text="Preview:", font=('Arial', 11, 'bold')).grid(row=preview_row, column=0, columnspan=3, sticky=tk.W, pady=(15, 5))
+        
+        preview_label = tk.Label(
+            main_frame, 
+            text="Enter scorer number to preview", 
+            wraplength=380, 
+            font=('Arial', 10),
+            justify=tk.LEFT,
+            bg='#f0f0f0',
+            fg='#333333',
+            padx=10,
+            pady=10,
+            relief=tk.SUNKEN
+        )
+        preview_label.grid(row=preview_row+1, column=0, columnspan=3, sticky=tk.EW, pady=(0, 15))
+        
+        def update_preview(*args):
+            """Update the preview text"""
+            team = team_var.get()
+            scorer = scorer_entry.get().strip()
+            assist1 = assist1_entry.get().strip()
+            assist2 = assist2_entry.get().strip()
+            
+            if not scorer:
+                preview_label.config(text="Enter scorer number to preview")
+                return
+            
+            if team == "home":
+                text = f"Patriots goal scored by number {scorer}!"
+                # Add assists with exclamation marks for Patriots
+                assists = [a for a in [assist1, assist2] if a]
+                if len(assists) == 2:
+                    text += f" assisted by number {assists[0]} and number {assists[1]}!"
+                elif len(assists) == 1:
+                    text += f" assisted by number {assists[0]}!"
+                else:
+                    text += " unassisted!"
+            else:
+                text = f"goal scored by number {scorer}"
+                # Add assists without exclamation marks for visitors
+                assists = [a for a in [assist1, assist2] if a]
+                if len(assists) == 2:
+                    text += f", assisted by number {assists[0]} and number {assists[1]}"
+                elif len(assists) == 1:
+                    text += f", assisted by number {assists[0]}"
+                else:
+                    text += ", unassisted"
+            
+            preview_label.config(text=text)
+        
+        # Update preview when inputs change
+        scorer_entry.bind('<KeyRelease>', update_preview)
+        assist1_entry.bind('<KeyRelease>', update_preview)
+        assist2_entry.bind('<KeyRelease>', update_preview)
+        team_var.trace('w', update_preview)
+        
+        # Announce button
+        def announce():
+            scorer = scorer_entry.get().strip()
+            if not scorer:
+                messagebox.showwarning("No Scorer", "Please enter the scorer's number!")
+                return
+            
+            team = team_var.get()
+            assist1 = assist1_entry.get().strip() or None
+            assist2 = assist2_entry.get().strip() or None
+            voice = voice_var.get()
+            
+            # Use Hume.ai if available, otherwise use macOS voice
+            use_hume = HUME_AVAILABLE and HUME_API_KEY
+            
+            # Generate and play announcement
+            announcement = self.controller.generate_goal_announcement(
+                team, scorer, assist1, assist2, voice, use_hume
+            )
+            
+            # Show what was announced
+            tts_method = "Hume.ai" if use_hume else "macOS"
+            self.current_track_label.config(text=f"📢 ({tts_method}) {announcement}")
+            
+            # Close window
+            pa_window.destroy()
+        
+        announce_btn = tk.Button(
+            main_frame,
+            text="🎤 ANNOUNCE GOAL",
+            command=announce,
+            font=('Arial', 14, 'bold'),
+            bg='#FF6B6B',
+            fg='white',
+            height=2
+        )
+        announce_btn.grid(row=preview_row+2, column=0, columnspan=3, sticky=tk.EW, pady=10)
+        
+        # Bind Enter key to announce
+        scorer_entry.bind('<Return>', lambda e: announce())
+        assist1_entry.bind('<Return>', lambda e: announce())
+        assist2_entry.bind('<Return>', lambda e: announce())
+        
+        # Configure grid weights
+        main_frame.columnconfigure(1, weight=1)
+        
+        # Center window
+        pa_window.update_idletasks()
+        x = (pa_window.winfo_screenwidth() // 2) - (pa_window.winfo_width() // 2)
+        y = (pa_window.winfo_screenheight() // 2) - (pa_window.winfo_height() // 2)
+        pa_window.geometry(f"+{x}+{y}")
+        
+        # Initial preview
+        update_preview()
+
+    def open_final_score_window(self):
+        """Open Final Score announcement configuration window"""
+        fs_window = tk.Toplevel(self.root)
+        fs_window.title("Final Score Announcement")
+        fs_window.geometry("450x400")
+        fs_window.transient(self.root)
+        fs_window.grab_set()
+        
+        # Main frame
+        main_frame = ttk.Frame(fs_window, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Title with Hume status
+        if HUME_AVAILABLE and HUME_API_KEY:
+            title_text = "🏁 Final Score Announcement (Hume.ai Enabled)"
+            title_color = 'green'
+        else:
+            title_text = "🏁 Final Score Announcement (macOS Voices)"
+            title_color = 'orange'
+        
+        title_label = ttk.Label(
+            main_frame,
+            text=title_text,
+            font=('Arial', 14, 'bold'),
+            foreground=title_color
+        )
+        title_label.grid(row=0, column=0, columnspan=3, pady=(0, 15))
+        
+        # Patriots Score input
+        ttk.Label(main_frame, text="Patriots Score:", font=('Arial', 11, 'bold')).grid(row=1, column=0, sticky=tk.W, pady=10)
+        patriots_score_entry = ttk.Entry(main_frame, width=10, font=('Arial', 12))
+        patriots_score_entry.grid(row=1, column=1, sticky=tk.W, pady=10)
+        patriots_score_entry.focus()
+        
+        # Visiting Team Name input
+        ttk.Label(main_frame, text="Visiting Team:", font=('Arial', 11)).grid(row=2, column=0, sticky=tk.W, pady=10)
+        visiting_team_entry = ttk.Entry(main_frame, width=20, font=('Arial', 12))
+        visiting_team_entry.grid(row=2, column=1, sticky=tk.W, pady=10)
+        
+        # Visiting Team Score input
+        ttk.Label(main_frame, text="Visiting Score:", font=('Arial', 11)).grid(row=3, column=0, sticky=tk.W, pady=10)
+        visiting_score_entry = ttk.Entry(main_frame, width=10, font=('Arial', 12))
+        visiting_score_entry.grid(row=3, column=1, sticky=tk.W, pady=10)
+        
+        # Voice selection (only show if not using Hume)
+        if not (HUME_AVAILABLE and HUME_API_KEY):
+            ttk.Label(main_frame, text="Voice:", font=('Arial', 11)).grid(row=4, column=0, sticky=tk.W, pady=10)
+            voice_var = tk.StringVar(value="Alex")
+            voice_combo = ttk.Combobox(main_frame, textvariable=voice_var, width=20, state='readonly')
+            voice_combo['values'] = ('Alex', 'Daniel', 'Samantha', 'Karen', 'Moira', 'Tessa', 'Rishi', 'Veena')
+            voice_combo.grid(row=4, column=1, sticky=tk.W, pady=10)
+            preview_row = 5
+        else:
+            # Show Hume.ai info
+            voice_var = tk.StringVar(value="Hume")
+            voice_info_text = "✅ Using Hume.ai professional voice"
+            if HUME_VOICE_ID:
+                voice_info_text += f" (Voice: {HUME_VOICE_ID[:20]}...)"
+            hume_info = ttk.Label(
+                main_frame,
+                text=voice_info_text,
+                font=('Arial', 10),
+                foreground='green'
+            )
+            hume_info.grid(row=4, column=0, columnspan=3, pady=10)
+            preview_row = 5
+        
+        # Preview section
+        ttk.Label(main_frame, text="Preview:", font=('Arial', 11, 'bold')).grid(row=preview_row, column=0, columnspan=3, sticky=tk.W, pady=(15, 5))
+        
+        preview_label = tk.Label(
+            main_frame, 
+            text="Enter scores to preview", 
+            wraplength=380, 
+            font=('Arial', 10),
+            justify=tk.LEFT,
+            bg='#f0f0f0',
+            fg='#333333',
+            padx=10,
+            pady=10,
+            relief=tk.SUNKEN
+        )
+        preview_label.grid(row=preview_row+1, column=0, columnspan=3, sticky=tk.EW, pady=(0, 15))
+        
+        def update_preview(*args):
+            """Update the preview text"""
+            home_score = patriots_score_entry.get().strip()
+            visiting_team = visiting_team_entry.get().strip()
+            visiting_score = visiting_score_entry.get().strip()
+            
+            if not home_score or not visiting_team or not visiting_score:
+                preview_label.config(text="Enter all fields to preview")
+                return
+            
+            text = f"Final score: Patriots {home_score}, {visiting_team} {visiting_score}"
+            preview_label.config(text=text)
+        
+        # Update preview when inputs change
+        patriots_score_entry.bind('<KeyRelease>', update_preview)
+        visiting_team_entry.bind('<KeyRelease>', update_preview)
+        visiting_score_entry.bind('<KeyRelease>', update_preview)
+        
+        # Announce button
+        def announce():
+            home_score = patriots_score_entry.get().strip()
+            visiting_team = visiting_team_entry.get().strip()
+            visiting_score = visiting_score_entry.get().strip()
+            
+            if not home_score or not visiting_team or not visiting_score:
+                messagebox.showwarning("Incomplete", "Please enter all fields!")
+                return
+            
+            voice = voice_var.get()
+            
+            # Use Hume.ai if available, otherwise use macOS voice
+            use_hume = HUME_AVAILABLE and HUME_API_KEY
+            
+            # Generate and play announcement
+            announcement = self.controller.generate_final_score_announcement(
+                home_score, visiting_team, visiting_score, voice, use_hume
+            )
+            
+            # Show what was announced
+            tts_method = "Hume.ai" if use_hume else "macOS"
+            self.current_track_label.config(text=f"🏁 ({tts_method}) {announcement}")
+            
+            # Close window
+            fs_window.destroy()
+        
+        announce_btn = tk.Button(
+            main_frame,
+            text="🎤 ANNOUNCE FINAL SCORE",
+            command=announce,
+            font=('Arial', 14, 'bold'),
+            bg='#9B59B6',
+            fg='white',
+            height=2
+        )
+        announce_btn.grid(row=preview_row+2, column=0, columnspan=3, sticky=tk.EW, pady=10)
+        
+        # Bind Enter key to announce
+        patriots_score_entry.bind('<Return>', lambda e: announce())
+        visiting_team_entry.bind('<Return>', lambda e: announce())
+        visiting_score_entry.bind('<Return>', lambda e: announce())
+        
+        # Configure grid weights
+        main_frame.columnconfigure(1, weight=1)
+        
+        # Center window
+        fs_window.update_idletasks()
+        x = (fs_window.winfo_screenwidth() // 2) - (fs_window.winfo_width() // 2)
+        y = (fs_window.winfo_screenheight() // 2) - (fs_window.winfo_height() // 2)
+        fs_window.geometry(f"+{x}+{y}")
+        
+        # Initial preview
+        update_preview()
+    
+
     def open_config_window(self):
         """Open configuration window as a popup"""
         config_window = tk.Toplevel(self.root)

@@ -21,8 +21,7 @@ try:
     load_dotenv()
     HUME_AVAILABLE = True
     HUME_API_KEY = os.getenv('HUME_API_KEY')
-    # Hardcoded custom voice ID
-    HUME_VOICE_ID = "Hockey Goal Announcer"
+    HUME_VOICE_ID = os.getenv('HUME_VOICE_ID')  # Optional custom voice
 except ImportError:
     HUME_AVAILABLE = False
     HUME_API_KEY = None
@@ -195,18 +194,25 @@ class AppleMusicController:
         """Generate and play goal announcement using Hume.ai or macOS text-to-speech"""
         # Build announcement text
         if team.lower() == "home":
-            announcement = f"Patriots goal! Scored by number {scorer}"
+            announcement = f"Patriots goal scored by number {scorer}!"
+            # Add assists with exclamation marks for Patriots
+            assists = [a for a in [assist1, assist2] if a and a.strip()]
+            if len(assists) == 2:
+                announcement += f" assisted by number {assists[0]} and number {assists[1]}!"
+            elif len(assists) == 1:
+                announcement += f" assisted by number {assists[0]}!"
+            else:
+                announcement += " unassisted!"
         else:
-            announcement = f"Goal scored by number {scorer}"
-        
-        # Add assists
-        assists = [a for a in [assist1, assist2] if a and a.strip()]
-        if len(assists) == 2:
-            announcement += f", assisted by {assists[0]} and {assists[1]}"
-        elif len(assists) == 1:
-            announcement += f", assisted by {assists[0]}"
-        else:
-            announcement += " unassisted."
+            announcement = f"goal scored by number {scorer}"
+            # Add assists without exclamation marks for visitors
+            assists = [a for a in [assist1, assist2] if a and a.strip()]
+            if len(assists) == 2:
+                announcement += f", assisted by number {assists[0]} and number {assists[1]}"
+            elif len(assists) == 1:
+                announcement += f", assisted by number {assists[0]}"
+            else:
+                announcement += ", unassisted"
         
         # Try Hume.ai first if available and enabled
         if use_hume and HUME_AVAILABLE and HUME_API_KEY:
@@ -216,7 +222,6 @@ class AppleMusicController:
                 # Use custom voice if specified, otherwise use a default Hume voice 
                 if HUME_VOICE_ID:
                     # For custom voices, specify provider='CUSTOM_VOICE'
-                    print(f"Attempting Hume TTS with custom voice: {HUME_VOICE_ID}")
                     utterance = PostedUtterance(
                         text=announcement,
                         voice=PostedUtteranceVoiceWithName(
@@ -226,7 +231,6 @@ class AppleMusicController:
                     )
                 else:
                     # Use Hume's default voice library
-                    print("Attempting Hume TTS with default voice: Ava Song")
                     utterance = PostedUtterance(
                         text=announcement,
                         voice=PostedUtteranceVoiceWithName(
@@ -257,45 +261,9 @@ class AppleMusicController:
                     except:
                         pass
                     
-                    print("✓ Hume TTS successful!")
                     return announcement
             except Exception as e:
                 print(f"Hume.ai TTS error: {e}")
-                
-                # If custom voice failed, try default Ava Song as fallback
-                if HUME_VOICE_ID:
-                    try:
-                        print("Trying fallback to Ava Song...")
-                        client = HumeClient(api_key=HUME_API_KEY)
-                        utterance = PostedUtterance(
-                            text=announcement,
-                            voice=PostedUtteranceVoiceWithName(
-                                name='Ava Song',
-                                provider='HUME_AI'
-                            )
-                        )
-                        result = client.tts.synthesize_json(utterances=[utterance])
-                        
-                        if result and result.generations and len(result.generations) > 0:
-                            audio_base64 = result.generations[0].audio
-                            audio_bytes = base64.b64decode(audio_base64)
-                            
-                            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_audio:
-                                temp_audio.write(audio_bytes)
-                                temp_audio_path = temp_audio.name
-                            
-                            subprocess.run(['afplay', temp_audio_path])
-                            
-                            try:
-                                os.unlink(temp_audio_path)
-                            except:
-                                pass
-                            
-                            print("✓ Fallback to Ava Song successful!")
-                            return announcement
-                    except Exception as e2:
-                        print(f"Ava Song fallback also failed: {e2}")
-                
                 print("Falling back to macOS voice...")
         
         # Fallback to macOS 'say' command
@@ -727,25 +695,15 @@ class HockeyMusicGUI:
                 return
             
             if team == "home":
-                text = f"Patriots goal scored by number {scorer}!"
-                # Add assists with exclamation marks for Patriots
-                assists = [a for a in [assist1, assist2] if a]
-                if len(assists) == 2:
-                    text += f" assisted by number {assists[0]} and number {assists[1]}!"
-                elif len(assists) == 1:
-                    text += f" assisted by number {assists[0]}!"
-                else:
-                    text += " unassisted!"
+                text = f"Patriots goal! Scored by number {scorer}"
             else:
-                text = f"goal scored by number {scorer}"
-                # Add assists without exclamation marks for visitors
-                assists = [a for a in [assist1, assist2] if a]
-                if len(assists) == 2:
-                    text += f", assisted by number {assists[0]} and number {assists[1]}"
-                elif len(assists) == 1:
-                    text += f", assisted by number {assists[0]}"
-                else:
-                    text += ", unassisted"
+                text = f"Goal scored by number {scorer}"
+            
+            assists = [a for a in [assist1, assist2] if a]
+            if len(assists) == 2:
+                text += f", assisted by {assists[0]} and {assists[1]}"
+            elif len(assists) == 1:
+                text += f", assisted by {assists[0]}"
             
             preview_label.config(text=text)
         

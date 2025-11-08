@@ -1,0 +1,79 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+hockey_venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment Variables
+.env
+.env.local
+.env.backup
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Configuration (contains user-specific paths and settings)
+hockey_music_config.json
+
+# Backups
+*.backup
+*.bak
+*_backup.py
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Documentation builds
+docs/_build/
+
+# Keep the docs folder structure
+!docs/
+!docs/**
+
+# Output files (generated patch files)
+hockey_music_controller_enhanced.py
+hockey_music_controller_with_final_score.py
+hockey_music_controller_patched.py
+add_final_score_feature.py
+
+# Keep the v2 script
+!add_final_score_feature_v2.py

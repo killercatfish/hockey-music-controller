@@ -8,10 +8,12 @@ import subprocess
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 import json
+import re
 import os
 import random
 import base64
 import tempfile
+import time
 
 # Try to import Hume AI SDK
 try:
@@ -32,19 +34,34 @@ class AppleMusicController:
     """Interface to control Apple Music via AppleScript"""
     
     @staticmethod
-    def run_applescript(script):
-        """Execute AppleScript and return output"""
-        try:
-            result = subprocess.run(
-                ['osascript', '-e', script],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            return result.stdout.strip(), result.returncode == 0
-        except Exception as e:
-            print(f"AppleScript error: {e}")
-            return "", False
+    def run_applescript(script, max_retries=3, retry_delay=0.5):
+        """Execute AppleScript with retry logic"""
+        for attempt in range(max_retries):
+            try:
+                result = subprocess.run(
+                    ['osascript', '-e', script],
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+                if result.returncode == 0:
+                    return result.stdout.strip(), True
+                else:
+                    error_msg = result.stderr.strip()
+                    print(f"⚠️  AppleScript error (attempt {attempt + 1}/{max_retries}): {error_msg}")
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_delay)
+            except subprocess.TimeoutExpired:
+                print(f"⏱️  AppleScript timeout (attempt {attempt + 1}/{max_retries})")
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay)
+            except Exception as e:
+                print(f"❌ AppleScript error (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay)
+        
+        print("💥 All retry attempts failed!")
+        return "", False
     
     def get_playlists(self):
         """Get list of all playlists"""
@@ -83,7 +100,28 @@ class AppleMusicController:
             play track {track_index} of playlist "{playlist_name}"
         end tell
         '''
-        return self.run_applescript(script)[1]
+        output, success = self.run_applescript(script)
+        if not success:
+            print(f"❌ FAILED: Could not play track {track_index} from '{playlist_name}'")
+        else:
+            print(f"✓ Playing track {track_index} from '{playlist_name}'")
+        return success
+    
+    def play_track_from_playlist_with_start_time(self, playlist_name, track_index, start_time):
+        """Play a specific track by index from playlist with custom start time (1-indexed)"""
+        script = f'''
+        tell application "Music"
+            play track {track_index} of playlist "{playlist_name}"
+            delay 0.5
+            set player position to {start_time}
+        end tell
+        '''
+        output, success = self.run_applescript(script)
+        if not success:
+            print(f"❌ FAILED: Could not play track {track_index} from '{playlist_name}'")
+        else:
+            print(f"✓ Playing track {track_index} from '{playlist_name}' at {start_time}s")
+        return success
     
     def play_track_by_name(self, track_name):
         """Play a specific track by name"""
@@ -112,7 +150,10 @@ class AppleMusicController:
     def stop(self):
         """Stop playback"""
         script = 'tell application "Music" to stop'
-        return self.run_applescript(script)[1]
+        output, success = self.run_applescript(script)
+        if not success:
+            print("❌ FAILED: Could not stop music")
+        return success
     
     def get_current_track(self):
         """Get currently playing track info"""
@@ -432,7 +473,8 @@ class HockeyMusicGUI:
         self.penalty_kill_song = tk.StringVar(value=self.config.get('penalty_kill', ''))
         self.playlist_tracks = []
         self.shuffled_order = []
-        self.current_track_index = 0  # Track current position in shuffled playlist
+        self.current_track_index = 0
+        self.start_times = self.config.get('start_times', {})  # Load saved start times
         
         self.setup_ui()
         self.setup_keyboard_shortcuts()
@@ -473,6 +515,7 @@ class HockeyMusicGUI:
         self.config['end_of_game'] = self.end_of_game_song.get()
         self.config['power_play'] = self.power_play_song.get()
         self.config['penalty_kill'] = self.penalty_kill_song.get()
+        self.config['start_times'] = self.start_times  # Save custom start times
         try:
             with open(self.config_file, 'w') as f:
                 json.dump(self.config, f, indent=2)
@@ -701,6 +744,11 @@ class HockeyMusicGUI:
         # Double-click to play
         self.playlist_listbox.bind('<Double-Button-1>', self.play_selected_track)
         
+        # Right-click for context menu
+        self.playlist_listbox.bind('<Button-2>', self.show_track_context_menu)  # macOS right-click
+        self.playlist_listbox.bind('<Control-Button-1>', self.show_track_context_menu)  # macOS Ctrl+click
+        self.playlist_listbox.bind('<Button-3>', self.show_track_context_menu)  # Windows/Linux right-click
+        
         # Keyboard navigation
         self.playlist_listbox.bind('<Up>', self.on_arrow_up)
         self.playlist_listbox.bind('<Down>', self.on_arrow_down)
@@ -874,7 +922,7 @@ class HockeyMusicGUI:
         scorer_entry.bind('<KeyRelease>', update_preview)
         assist1_entry.bind('<KeyRelease>', update_preview)
         assist2_entry.bind('<KeyRelease>', update_preview)
-        team_var.trace('w', update_preview)
+        team_var.trace_add('write', lambda *args: update_preview())
         
         # Announce button
         def announce():
@@ -1349,7 +1397,16 @@ class HockeyMusicGUI:
                 # Completely stopped - restart from current playlist position
                 playlist_name = self.current_playlist.get()
                 actual_track_idx = self.shuffled_order[self.current_track_index] + 1
-                self.controller.play_track_from_playlist(playlist_name, actual_track_idx)
+                
+                # Get track info for start time lookup
+                track_info = self.playlist_tracks[self.shuffled_order[self.current_track_index]]
+                
+                # Check if this track has a custom start time
+                if track_info in self.start_times:
+                    start_time = self.start_times[track_info]
+                    self.controller.play_track_from_playlist_with_start_time(playlist_name, actual_track_idx, start_time)
+                else:
+                    self.controller.play_track_from_playlist(playlist_name, actual_track_idx)
             else:
                 # Just paused or has a track - resume
                 self.controller.play_pause()
@@ -1377,10 +1434,18 @@ class HockeyMusicGUI:
         playlist_name = self.current_playlist.get()
         actual_track_idx = self.shuffled_order[self.current_track_index] + 1  # 1-indexed
         
+        # Get track info for start time lookup
+        track_info = self.playlist_tracks[self.shuffled_order[self.current_track_index]]
+        
         # Queue the track by playing and immediately stopping
         # Use a delayed call to ensure stop comes after play starts
         def queue_next_track():
-            self.controller.play_track_from_playlist(playlist_name, actual_track_idx)
+            # Check if this track has a custom start time
+            if track_info in self.start_times:
+                start_time = self.start_times[track_info]
+                self.controller.play_track_from_playlist_with_start_time(playlist_name, actual_track_idx, start_time)
+            else:
+                self.controller.play_track_from_playlist(playlist_name, actual_track_idx)
             # Stop it immediately - multiple times to be sure
             self.root.after(5, lambda: self.controller.stop())
             self.root.after(20, lambda: self.controller.stop())
@@ -1454,7 +1519,15 @@ class HockeyMusicGUI:
         self.playlist_listbox.delete(0, tk.END)
         for i, track_idx in enumerate(self.shuffled_order):
             track = self.playlist_tracks[track_idx]
-            self.playlist_listbox.insert(tk.END, f"{i+1}. {track}")
+            
+            # Add indicator if track has custom start time
+            if track in self.start_times:
+                start_time = self.start_times[track]
+                display_text = f"{i+1}. ⏱️ [{self.format_seconds(start_time)}] {track}"
+            else:
+                display_text = f"{i+1}. {track}"
+            
+            self.playlist_listbox.insert(tk.END, display_text)
     
     def shuffle_playlist(self):
         """Shuffle the playlist order"""
@@ -1497,10 +1570,19 @@ class HockeyMusicGUI:
         # Update our current position
         self.current_track_index = list_idx
         
+        # Get track info for start time lookup
+        track_info = self.playlist_tracks[self.shuffled_order[list_idx]]
+        
         playlist_name = self.current_playlist.get()
         # Convert shuffled index to actual playlist index (1-indexed)
         actual_track_idx = self.shuffled_order[list_idx] + 1
-        self.controller.play_track_from_playlist(playlist_name, actual_track_idx)
+        
+        # Check if this track has a custom start time
+        if track_info in self.start_times:
+            start_time = self.start_times[track_info]
+            self.controller.play_track_from_playlist_with_start_time(playlist_name, actual_track_idx, start_time)
+        else:
+            self.controller.play_track_from_playlist(playlist_name, actual_track_idx)
         
         # Keep highlight on this song
         self.playlist_listbox.selection_clear(0, tk.END)
@@ -1565,8 +1647,16 @@ class HockeyMusicGUI:
             self.current_track_index = highlighted_idx
             playlist_name = self.current_playlist.get()
             if playlist_name and self.shuffled_order:
+                # Get track info for start time lookup
+                track_info = self.playlist_tracks[self.shuffled_order[highlighted_idx]]
+                
                 actual_track_idx = self.shuffled_order[highlighted_idx] + 1
-                self.controller.play_track_from_playlist(playlist_name, actual_track_idx)
+                # Check if this track has a custom start time
+                if track_info in self.start_times:
+                    start_time = self.start_times[track_info]
+                    self.controller.play_track_from_playlist_with_start_time(playlist_name, actual_track_idx, start_time)
+                else:
+                    self.controller.play_track_from_playlist(playlist_name, actual_track_idx)
         
         return "break"  # Prevent default listbox behavior
     
@@ -1584,6 +1674,119 @@ class HockeyMusicGUI:
             self.update_playlist_display()
             self.playlist_listbox.selection_set(current_index)
             self.drag_start_index = current_index
+    
+    def show_track_context_menu(self, event):
+        """Show right-click context menu for track"""
+        # Get the track under the cursor
+        index = self.playlist_listbox.nearest(event.y)
+        if index < 0 or index >= len(self.shuffled_order):
+            return
+        
+        # Select the track
+        self.playlist_listbox.selection_clear(0, tk.END)
+        self.playlist_listbox.selection_set(index)
+        
+        # Get track info
+        track_info = self.playlist_tracks[self.shuffled_order[index]]
+        
+        # Create context menu
+        menu = tk.Menu(self.root, tearoff=0)
+        
+        # Show current start time if set
+        if track_info in self.start_times:
+            current_time = self.start_times[track_info]
+            menu.add_command(
+                label=f"⏱️ Start Time: {self.format_seconds(current_time)}",
+                state='disabled'
+            )
+            menu.add_separator()
+            menu.add_command(
+                label="✏️ Edit Start Time",
+                command=lambda: self.set_track_start_time(index, track_info)
+            )
+            menu.add_command(
+                label="🗑️ Remove Start Time",
+                command=lambda: self.remove_track_start_time(track_info)
+            )
+        else:
+            menu.add_command(
+                label="⏱️ Set Start Time",
+                command=lambda: self.set_track_start_time(index, track_info)
+            )
+        
+        # Show menu
+        menu.tk_popup(event.x_root, event.y_root)
+    
+    def set_track_start_time(self, index, track_info):
+        """Set custom start time for a track"""
+        current_time = self.start_times.get(track_info, 0)
+        current_formatted = self.format_seconds(current_time)
+        
+        # Ask for start time
+        time_str = simpledialog.askstring(
+            "Set Start Time",
+            f"Enter start time for:\n{track_info}\n\n"
+            f"Current: {current_formatted}\n\n"
+            "Format: seconds (e.g., '15') or MM:SS (e.g., '1:30')",
+            parent=self.root,
+            initialvalue=current_formatted
+        )
+        
+        if time_str:
+            try:
+                # Parse the time string
+                seconds = self.parse_time_string(time_str)
+                
+                # Store the start time
+                self.start_times[track_info] = seconds
+                self.save_config()
+                
+                # Update display to show indicator
+                self.update_playlist_display()
+                
+                messagebox.showinfo(
+                    "Success",
+                    f"Start time set to {self.format_seconds(seconds)}"
+                )
+            except ValueError as e:
+                messagebox.showerror("Invalid Time", str(e))
+    
+    def remove_track_start_time(self, track_info):
+        """Remove custom start time for a track"""
+        if track_info in self.start_times:
+            del self.start_times[track_info]
+            self.save_config()
+            self.update_playlist_display()
+            messagebox.showinfo("Success", "Start time removed")
+    
+    def parse_time_string(self, time_str):
+        """Parse time string to seconds (supports 'MM:SS' or just seconds)"""
+        time_str = time_str.strip()
+        
+        # Check if it's in MM:SS format
+        if ':' in time_str:
+            parts = time_str.split(':')
+            if len(parts) == 2:
+                try:
+                    minutes = int(parts[0])
+                    seconds = int(parts[1])
+                    return minutes * 60 + seconds
+                except ValueError:
+                    raise ValueError("Invalid time format. Use MM:SS or seconds.")
+            else:
+                raise ValueError("Invalid time format. Use MM:SS or seconds.")
+        else:
+            # Just seconds
+            try:
+                return int(time_str)
+            except ValueError:
+                raise ValueError("Invalid time format. Use MM:SS or seconds.")
+    
+    def format_seconds(self, seconds):
+        """Format seconds as MM:SS"""
+        minutes = seconds // 60
+        secs = seconds % 60
+        return f"{minutes}:{secs:02d}"
 
 
 def main():

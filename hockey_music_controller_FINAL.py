@@ -921,6 +921,18 @@ class HockeyMusicGUI:
                 team, scorer, assist1, assist2, voice, use_hume
             )
             
+            # Play celebration sound after home goal announcements
+            if team.lower() == "home":
+                celebration_sound = os.path.expanduser("sound_clips/woo.m4a")
+                if os.path.exists(celebration_sound):
+                    try:
+                        subprocess.run(['afplay', celebration_sound], check=False)
+                        print("🎉 Playing celebration sound!")
+                    except Exception as e:
+                        print(f"⚠️  Could not play celebration sound: {e}")
+                else:
+                    print(f"ℹ️  Celebration sound not found at: {celebration_sound}")
+            
             # Show what was announced
             tts_method = "Hume.ai" if use_hume else "macOS"
             self.current_track_label.config(text=f"📢 ({tts_method}) {announcement}")

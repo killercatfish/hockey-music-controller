@@ -17,6 +17,7 @@ import time
 import threading
 import queue
 import socket
+import csv
 
 # Try to import Hume AI SDK
 try:
@@ -65,6 +66,31 @@ class AppleMusicController:
         
         print("💥 All retry attempts failed!")
         return "", False
+    
+    @staticmethod
+    def load_roster(roster_file=None):
+        """Load player roster from CSV file"""
+        if roster_file is None:
+            roster_file = os.path.expanduser("~/rosters/patriots_roster_2025.csv")
+        
+        roster = {}
+        if os.path.exists(roster_file):
+            try:
+                with open(roster_file, 'r') as f:
+                    reader = csv.reader(f)
+                    for row in reader:
+                        if len(row) >= 2:
+                            number = row[0].strip()
+                            name = row[1].strip()
+                            roster[number] = name
+                print(f"✓ Loaded {len(roster)} players from roster")
+                return roster
+            except Exception as e:
+                print(f"⚠️  Error loading roster: {e}")
+        else:
+            print(f"ℹ️  Roster file not found: {roster_file}")
+        
+        return {}
     
     def get_playlists(self):
         """Get list of all playlists"""
@@ -271,20 +297,39 @@ class AppleMusicController:
             result_queue.put(('error', str(e)))
 
     @staticmethod
-    def generate_goal_announcement(team, scorer, assist1=None, assist2=None, voice="Alex", use_hume=True):
+    def generate_goal_announcement(team, scorer, assist1=None, assist2=None, voice="Alex", use_hume=True, roster=None):
         """Generate and play goal announcement using Hume.ai or skip if unavailable"""
-        # Build announcement text
+        # Build announcement text with player name lookup
         if team.lower() == "home":
-            announcement = f"Patriots goal! Scored by number {scorer}"
+            # Look up player name from roster
+            player_name = None
+            if roster and scorer in roster:
+                player_name = roster[scorer]
+            
+            if player_name:
+                announcement = f"Patriots goal! Scored by number {scorer}, {player_name}"
+            else:
+                announcement = f"Patriots goal! Scored by number {scorer}"
         else:
             announcement = f"Goal scored by number {scorer}"
         
-        # Add assists
+        # Add assists (with name lookup for home team)
         assists = [a for a in [assist1, assist2] if a and a.strip()]
         if len(assists) == 2:
-            announcement += f", assisted by {assists[0]} and {assists[1]}"
+            # Look up assist names for home team
+            if team.lower() == "home" and roster:
+                assist1_name = roster.get(assists[0], assists[0])
+                assist2_name = roster.get(assists[1], assists[1])
+                announcement += f", assisted by {assist1_name} and {assist2_name}"
+            else:
+                announcement += f", assisted by {assists[0]} and {assists[1]}"
         elif len(assists) == 1:
-            announcement += f", assisted by {assists[0]}"
+            # Look up assist name for home team
+            if team.lower() == "home" and roster:
+                assist1_name = roster.get(assists[0], assists[0])
+                announcement += f", assisted by {assist1_name}"
+            else:
+                announcement += f", assisted by {assists[0]}"
         else:
             announcement += " unassisted."
         
@@ -452,6 +497,7 @@ class HockeyMusicGUI:
         self.shuffled_order = []
         self.current_track_index = 0
         self.start_times = self.config.get('start_times', {})  # Load saved start times
+        self.roster = self.controller.load_roster()  # Load player roster
         
         self.setup_ui()
         self.setup_keyboard_shortcuts()
@@ -873,13 +919,21 @@ class HockeyMusicGUI:
                 return
             
             if team == "home":
-                text = f"Patriots goal scored by number {scorer}!"
-                # Add assists with exclamation marks for Patriots
-                assists = [a for a in [assist1, assist2] if a]
+                # Look up player name from roster
+                scorer_name = self.roster.get(scorer, f"number {scorer}")
+                text = f"Patriots goal scored by {scorer_name}!"
+                
+                # Add assists with name lookup
+                assists = []
+                if assist1:
+                    assists.append(self.roster.get(assist1, f"number {assist1}"))
+                if assist2:
+                    assists.append(self.roster.get(assist2, f"number {assist2}"))
+                
                 if len(assists) == 2:
-                    text += f" assisted by number {assists[0]} and number {assists[1]}!"
+                    text += f" assisted by {assists[0]} and {assists[1]}!"
                 elif len(assists) == 1:
-                    text += f" assisted by number {assists[0]}!"
+                    text += f" assisted by {assists[0]}!"
                 else:
                     text += " unassisted!"
             else:
@@ -918,8 +972,20 @@ class HockeyMusicGUI:
             
             # Generate and play announcement
             announcement = self.controller.generate_goal_announcement(
-                team, scorer, assist1, assist2, voice, use_hume
+                team, scorer, assist1, assist2, voice, use_hume, self.roster
             )
+            
+            # Play celebration sound after home goal announcements
+            if team.lower() == "home":
+                celebration_sound = os.path.expanduser("~/woo.m4a")
+                if os.path.exists(celebration_sound):
+                    try:
+                        subprocess.run(['afplay', celebration_sound], check=False)
+                        print("🎉 Playing celebration sound!")
+                    except Exception as e:
+                        print(f"⚠️  Could not play celebration sound: {e}")
+                else:
+                    print(f"ℹ️  Celebration sound not found at: {celebration_sound}")
             
             # Show what was announced
             tts_method = "Hume.ai" if use_hume else "macOS"

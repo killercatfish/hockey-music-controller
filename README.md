@@ -6,6 +6,8 @@ A professional music and PA announcement controller for hockey games, featuring 
 ![Python](https://img.shields.io/badge/python-3.8+-green)
 ![Platform](https://img.shields.io/badge/platform-macOS-lightgrey)
 
+![Player](https://github.com/killercatfish/hockey-music-controller/assets/player.jpg)
+
 ## ✨ Features
 
 ### Music Control

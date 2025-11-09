@@ -14,9 +14,6 @@ import random
 import base64
 import tempfile
 import time
-import threading
-import queue
-import socket
 
 # Try to import Hume AI SDK
 try:
@@ -235,44 +232,8 @@ class AppleMusicController:
         return self.run_applescript(script)[1]
     
     @staticmethod
-    def _hume_tts_worker(announcement, voice_id, api_key, result_queue):
-        """Worker function to run Hume TTS in a separate thread"""
-        try:
-            # Quick network check - fail fast if DNS is down
-            socket.setdefaulttimeout(2)
-            try:
-                socket.getaddrinfo('api.hume.ai', 443)
-            except socket.error as e:
-                result_queue.put(('error', f'Network unreachable: {e}'))
-                return
-            
-            print(f"🎤 Starting Hume TTS with custom voice: {voice_id}")
-            client = HumeClient(api_key=api_key)
-            
-            # Use custom voice
-            utterance = PostedUtterance(
-                text=announcement,
-                voice=PostedUtteranceVoiceWithName(
-                    name=voice_id,
-                    provider='CUSTOM_VOICE'
-                )
-            )
-            
-            # Synthesize speech
-            result = client.tts.synthesize_json(utterances=[utterance])
-            
-            # Return result to queue
-            if result and result.generations and len(result.generations) > 0:
-                result_queue.put(('success', result.generations[0].audio))
-            else:
-                result_queue.put(('error', 'No audio generated'))
-                
-        except Exception as e:
-            result_queue.put(('error', str(e)))
-
-    @staticmethod
     def generate_goal_announcement(team, scorer, assist1=None, assist2=None, voice="Alex", use_hume=True):
-        """Generate and play goal announcement using Hume.ai or skip if unavailable"""
+        """Generate and play goal announcement using Hume.ai or macOS text-to-speech"""
         # Build announcement text
         if team.lower() == "home":
             announcement = f"Patriots goal! Scored by number {scorer}"
@@ -288,33 +249,40 @@ class AppleMusicController:
         else:
             announcement += " unassisted."
         
-        # Try Hume.ai if available and enabled
-        if use_hume and HUME_AVAILABLE and HUME_API_KEY and HUME_VOICE_ID:
-            result_queue = queue.Queue()
-            
-            # Start worker thread
-            thread = threading.Thread(
-                target=AppleMusicController._hume_tts_worker,
-                args=(announcement, HUME_VOICE_ID, HUME_API_KEY, result_queue),
-                daemon=True
-            )
-            thread.start()
-            
-            # Wait for result with timeout
-            thread.join(timeout=5.0)
-            
-            # Check if thread finished
-            if thread.is_alive():
-                print("❌ Hume TTS timed out after 5 seconds - skipping announcement")
-                return announcement
-            
-            # Get result from queue
+        # Try Hume.ai first if available and enabled
+        if use_hume and HUME_AVAILABLE and HUME_API_KEY:
             try:
-                status, data = result_queue.get_nowait()
+                client = HumeClient(api_key=HUME_API_KEY)
                 
-                if status == 'success':
-                    # Decode base64 audio and play it
-                    audio_bytes = base64.b64decode(data)
+                # Use custom voice if specified, otherwise use a default Hume voice 
+                if HUME_VOICE_ID:
+                    # For custom voices, specify provider='CUSTOM_VOICE'
+                    print(f"Attempting Hume TTS with custom voice: {HUME_VOICE_ID}")
+                    utterance = PostedUtterance(
+                        text=announcement,
+                        voice=PostedUtteranceVoiceWithName(
+                            name=HUME_VOICE_ID,
+                            provider='CUSTOM_VOICE'
+                        )
+                    )
+                else:
+                    # Use Hume's default voice library
+                    print("Attempting Hume TTS with default voice: Ava Song")
+                    utterance = PostedUtterance(
+                        text=announcement,
+                        voice=PostedUtteranceVoiceWithName(
+                            name='Ava Song',
+                            provider='HUME_AI'
+                        )
+                    )
+                
+                # Synthesize speech
+                result = client.tts.synthesize_json(utterances=[utterance])
+                
+                # Decode base64 audio and play it
+                if result and result.generations and len(result.generations) > 0:
+                    audio_base64 = result.generations[0].audio
+                    audio_bytes = base64.b64decode(audio_base64)
                     
                     # Write to temporary file and play
                     with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_audio:
@@ -332,60 +300,91 @@ class AppleMusicController:
                     
                     print("✓ Hume TTS successful!")
                     return announcement
-                else:
-                    print(f"❌ Hume TTS error: {data}")
-                    print("⏭️  Skipping announcement")
-                    return announcement
-                    
-            except queue.Empty:
-                print("❌ Hume TTS failed - no result returned")
-                print("⏭️  Skipping announcement")
-                return announcement
-        else:
-            if not HUME_AVAILABLE:
-                print("ℹ️  Hume SDK not available - skipping announcement")
-            elif not HUME_API_KEY:
-                print("ℹ️  Hume API key not configured - skipping announcement")
-            elif not HUME_VOICE_ID:
-                print("ℹ️  Hume voice ID not configured - skipping announcement")
-            else:
-                print("ℹ️  Hume TTS disabled - skipping announcement")
+            except Exception as e:
+                print(f"Hume.ai TTS error: {e}")
+                
+                # If custom voice failed, try default Ava Song as fallback
+                if HUME_VOICE_ID:
+                    try:
+                        print("Trying fallback to Ava Song...")
+                        client = HumeClient(api_key=HUME_API_KEY)
+                        utterance = PostedUtterance(
+                            text=announcement,
+                            voice=PostedUtteranceVoiceWithName(
+                                name='Ava Song',
+                                provider='HUME_AI'
+                            )
+                        )
+                        result = client.tts.synthesize_json(utterances=[utterance])
+                        
+                        if result and result.generations and len(result.generations) > 0:
+                            audio_base64 = result.generations[0].audio
+                            audio_bytes = base64.b64decode(audio_base64)
+                            
+                            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_audio:
+                                temp_audio.write(audio_bytes)
+                                temp_audio_path = temp_audio.name
+                            
+                            subprocess.run(['afplay', temp_audio_path])
+                            
+                            try:
+                                os.unlink(temp_audio_path)
+                            except:
+                                pass
+                            
+                            print("✓ Fallback to Ava Song successful!")
+                            return announcement
+                    except Exception as e2:
+                        print(f"Ava Song fallback also failed: {e2}")
+                
+                print("Falling back to macOS voice...")
+        
+        # Fallback to macOS 'say' command
+        # Use a deeper voice for PA effect
+        subprocess.run(['say', '-v', voice, '-r', '180', announcement])
         
         return announcement
 
     @staticmethod
     def generate_final_score_announcement(home_score, visiting_team, visiting_score, voice="Alex", use_hume=True):
-        """Generate and play final score announcement using Hume.ai or skip if unavailable"""
+        """Generate and play final score announcement using Hume.ai or macOS text-to-speech"""
         # Build announcement text
         announcement = f"Final score: Patriots {home_score}, {visiting_team} {visiting_score}"
         
-        # Try Hume.ai if available and enabled
-        if use_hume and HUME_AVAILABLE and HUME_API_KEY and HUME_VOICE_ID:
-            result_queue = queue.Queue()
-            
-            # Start worker thread
-            thread = threading.Thread(
-                target=AppleMusicController._hume_tts_worker,
-                args=(announcement, HUME_VOICE_ID, HUME_API_KEY, result_queue),
-                daemon=True
-            )
-            thread.start()
-            
-            # Wait for result with timeout
-            thread.join(timeout=5.0)
-            
-            # Check if thread finished
-            if thread.is_alive():
-                print("❌ Hume TTS timed out after 5 seconds - skipping announcement")
-                return announcement
-            
-            # Get result from queue
+        # Try Hume.ai first if available and enabled
+        if use_hume and HUME_AVAILABLE and HUME_API_KEY:
             try:
-                status, data = result_queue.get_nowait()
+                client = HumeClient(api_key=HUME_API_KEY)
                 
-                if status == 'success':
-                    # Decode base64 audio and play it
-                    audio_bytes = base64.b64decode(data)
+                # Use custom voice if specified, otherwise use a default Hume voice 
+                if HUME_VOICE_ID:
+                    # For custom voices, specify provider='CUSTOM_VOICE'
+                    print(f"Attempting Hume TTS with custom voice: {HUME_VOICE_ID}")
+                    utterance = PostedUtterance(
+                        text=announcement,
+                        voice=PostedUtteranceVoiceWithName(
+                            name=HUME_VOICE_ID,
+                            provider='CUSTOM_VOICE'
+                        )
+                    )
+                else:
+                    # Use Hume's default voice library
+                    print("Attempting Hume TTS with default voice: Ava Song")
+                    utterance = PostedUtterance(
+                        text=announcement,
+                        voice=PostedUtteranceVoiceWithName(
+                            name='Ava Song',
+                            provider='HUME_AI'
+                        )
+                    )
+                
+                # Synthesize speech
+                result = client.tts.synthesize_json(utterances=[utterance])
+                
+                # Decode base64 audio and play it
+                if result and result.generations and len(result.generations) > 0:
+                    audio_base64 = result.generations[0].audio
+                    audio_bytes = base64.b64decode(audio_base64)
                     
                     # Write to temporary file and play
                     with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_audio:
@@ -403,24 +402,48 @@ class AppleMusicController:
                     
                     print("✓ Hume TTS successful!")
                     return announcement
-                else:
-                    print(f"❌ Hume TTS error: {data}")
-                    print("⏭️  Skipping announcement")
-                    return announcement
-                    
-            except queue.Empty:
-                print("❌ Hume TTS failed - no result returned")
-                print("⏭️  Skipping announcement")
-                return announcement
-        else:
-            if not HUME_AVAILABLE:
-                print("ℹ️  Hume SDK not available - skipping announcement")
-            elif not HUME_API_KEY:
-                print("ℹ️  Hume API key not configured - skipping announcement")
-            elif not HUME_VOICE_ID:
-                print("ℹ️  Hume voice ID not configured - skipping announcement")
-            else:
-                print("ℹ️  Hume TTS disabled - skipping announcement")
+            except Exception as e:
+                print(f"Hume.ai TTS error: {e}")
+                
+                # If custom voice failed, try default Ava Song as fallback
+                if HUME_VOICE_ID:
+                    try:
+                        print("Trying fallback to Ava Song...")
+                        client = HumeClient(api_key=HUME_API_KEY)
+                        utterance = PostedUtterance(
+                            text=announcement,
+                            voice=PostedUtteranceVoiceWithName(
+                                name='Ava Song',
+                                provider='HUME_AI'
+                            )
+                        )
+                        result = client.tts.synthesize_json(utterances=[utterance])
+                        
+                        if result and result.generations and len(result.generations) > 0:
+                            audio_base64 = result.generations[0].audio
+                            audio_bytes = base64.b64decode(audio_base64)
+                            
+                            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_audio:
+                                temp_audio.write(audio_bytes)
+                                temp_audio_path = temp_audio.name
+                            
+                            subprocess.run(['afplay', temp_audio_path])
+                            
+                            try:
+                                os.unlink(temp_audio_path)
+                            except:
+                                pass
+                            
+                            print("✓ Fallback to Ava Song successful!")
+                            return announcement
+                    except Exception as e2:
+                        print(f"Ava Song fallback also failed: {e2}")
+                
+                print("Falling back to macOS voice...")
+        
+        # Fallback to macOS 'say' command
+        # Use a deeper voice for PA effect
+        subprocess.run(['say', '-v', voice, '-r', '180', announcement])
         
         return announcement
 

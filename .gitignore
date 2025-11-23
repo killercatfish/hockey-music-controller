@@ -40,7 +40,6 @@ venv.bak/
 *.swp
 *.swo
 *~
-.DS_Store
 
 # macOS
 .DS_Store
@@ -48,6 +47,8 @@ venv.bak/
 .LSOverride
 Icon
 ._*
+.Spotlight-V100
+.Trashes
 
 # Configuration (contains user-specific paths and settings)
 hockey_music_config.json
@@ -56,11 +57,28 @@ hockey_music_config.json
 *.backup
 *.bak
 *_backup.py
+*.backup_*
 
 # Temporary files
 *.tmp
 *.temp
 *.log
+structure.txt
+
+# Build artifacts
+build/
+dist/
+*.app/
+*.pkg
+*.dmg
+
+# PyInstaller
+*.spec
+*.manifest
+*.exe
+
+# Testing
+testing/
 
 # Documentation builds
 docs/_build/
@@ -69,11 +87,9 @@ docs/_build/
 !docs/
 !docs/**
 
-# Output files (generated patch files)
-hockey_music_controller_enhanced.py
-hockey_music_controller_with_final_score.py
-hockey_music_controller_patched.py
-add_final_score_feature.py
+# Keep example files
+!.env.example
 
-# Keep the v2 script
-!add_final_score_feature_v2.py
+# Optional: Uncomment if you want to exclude user-specific files
+rosters/*.csv
+sound_clips/*.m4a

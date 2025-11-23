@@ -17,6 +17,7 @@ import time
 import threading
 import queue
 import socket
+import csv
 
 # Try to import Hume AI SDK
 try:
@@ -37,7 +38,7 @@ class AppleMusicController:
     """Interface to control Apple Music via AppleScript"""
     
     @staticmethod
-    def run_applescript(script, max_retries=3, retry_delay=0.5):
+    def run_applescript(script, max_retries=3, retry_delay=0.5, silent_on_error=False):
         """Execute AppleScript with retry logic"""
         for attempt in range(max_retries):
             try:
@@ -51,19 +52,32 @@ class AppleMusicController:
                     return result.stdout.strip(), True
                 else:
                     error_msg = result.stderr.strip()
-                    print(f"⚠️  AppleScript error (attempt {attempt + 1}/{max_retries}): {error_msg}")
+                    
+                    # Check if this is the "no track playing" error (-1728)
+                    # This is a NORMAL state, not an actual error!
+                    if '(-1728)' in error_msg:
+                        # Silently return on first attempt for -1728 errors
+                        return "", False
+                    
+                    # For other errors, print messages unless silent mode
+                    if not silent_on_error:
+                        print(f"⚠️  AppleScript error (attempt {attempt + 1}/{max_retries}): {error_msg}")
+                    
                     if attempt < max_retries - 1:
                         time.sleep(retry_delay)
             except subprocess.TimeoutExpired:
-                print(f"⏱️  AppleScript timeout (attempt {attempt + 1}/{max_retries})")
+                if not silent_on_error:
+                    print(f"⏱️  AppleScript timeout (attempt {attempt + 1}/{max_retries})")
                 if attempt < max_retries - 1:
                     time.sleep(retry_delay)
             except Exception as e:
-                print(f"❌ AppleScript error (attempt {attempt + 1}/{max_retries}): {e}")
+                if not silent_on_error:
+                    print(f"❌ AppleScript error (attempt {attempt + 1}/{max_retries}): {e}")
                 if attempt < max_retries - 1:
                     time.sleep(retry_delay)
         
-        print("💥 All retry attempts failed!")
+        if not silent_on_error:
+            print("💥 All retry attempts failed!")
         return "", False
     
     def get_playlists(self):
@@ -235,6 +249,31 @@ class AppleMusicController:
         return self.run_applescript(script)[1]
     
     @staticmethod
+    
+    @staticmethod
+    def load_roster(roster_file='rosters/patriots_roster_2025.csv'):
+        """Load player roster from CSV file"""
+        roster = {}
+        roster_path = os.path.expanduser(roster_file)
+        
+        if not os.path.exists(roster_path):
+            print(f"⚠️  Roster file not found: {roster_path}")
+            return roster
+        
+        try:
+            with open(roster_path, 'r') as f:
+                reader = csv.reader(f)
+                for row in reader:
+                    if len(row) >= 2:
+                        number = row[0].strip()
+                        name = row[1].strip()
+                        roster[number] = name
+            print(f"✅ Loaded {len(roster)} players from roster")
+        except Exception as e:
+            print(f"❌ Error loading roster: {e}")
+        
+        return roster
+
     def _hume_tts_worker(announcement, voice_id, api_key, result_queue):
         """Worker function to run Hume TTS in a separate thread"""
         try:
@@ -270,23 +309,44 @@ class AppleMusicController:
         except Exception as e:
             result_queue.put(('error', str(e)))
 
+    # IMPROVED VERSION WITH BETTER EMOTION
+    # Just copy this entire method and replace your existing one
+
     @staticmethod
     def generate_goal_announcement(team, scorer, assist1=None, assist2=None, voice="Alex", use_hume=True):
-        """Generate and play goal announcement using Hume.ai or skip if unavailable"""
-        # Build announcement text
-        if team.lower() == "home":
-            announcement = f"Patriots goal! Scored by number {scorer}"
-        else:
-            announcement = f"Goal scored by number {scorer}"
+        """Generate and play goal announcement with improved emotion and energy"""
         
-        # Add assists
-        assists = [a for a in [assist1, assist2] if a and a.strip()]
-        if len(assists) == 2:
-            announcement += f", assisted by {assists[0]} and {assists[1]}"
-        elif len(assists) == 1:
-            announcement += f", assisted by {assists[0]}"
+        # Build announcement text with BETTER EMOTION
+        if team.lower() == "home":
+            # HOME GOALS: Excited and energetic!
+            roster = AppleMusicController.load_roster()
+            player_name = roster.get(str(scorer), None)
+            
+            if player_name:
+                # MORE EXCITING: Double exclamation, uppercase GOAL
+                announcement = f"Patriots GOAL!! Scored by number {scorer}, {player_name}!"
+            else:
+                announcement = f"Patriots GOAL!! Scored by number {scorer}!"
+            
+            # Add assists with energy
+            assists = [a for a in [assist1, assist2] if a and a.strip()]
+            if len(assists) == 2:
+                announcement += f" Assisted by {assists[0]} and {assists[1]}!"
+            elif len(assists) == 1:
+                announcement += f" Assisted by {assists[0]}!"
+            else:
+                announcement += " Unassisted!"
         else:
-            announcement += " unassisted."
+            # AWAY GOALS: Professional and neutral
+            announcement = f"Goal scored by number {scorer}"
+            
+            assists = [a for a in [assist1, assist2] if a and a.strip()]
+            if len(assists) == 2:
+                announcement += f", assisted by {assists[0]} and {assists[1]}."
+            elif len(assists) == 1:
+                announcement += f", assisted by {assists[0]}."
+            else:
+                announcement += ", unassisted."
         
         # Try Hume.ai if available and enabled
         if use_hume and HUME_AVAILABLE and HUME_API_KEY and HUME_VOICE_ID:

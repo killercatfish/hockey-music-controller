@@ -11,10 +11,16 @@ echo ""
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PYTHON_FILE="$SCRIPT_DIR/hockey_music_controller.py"
 
-# Check if Python script exists
+# Check if the app is present
 if [ ! -f "$PYTHON_FILE" ]; then
     echo "❌ Error: hockey_music_controller.py not found in this directory"
     echo "Please ensure all files are in the same folder."
+    exit 1
+fi
+
+if [ ! -d "$SCRIPT_DIR/hockeymusic" ]; then
+    echo "❌ Error: the hockeymusic/ package is missing"
+    echo "Re-clone or pull the repository."
     exit 1
 fi
 

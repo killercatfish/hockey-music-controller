@@ -50,9 +50,15 @@ EOF
 
 chmod +x "${APP_DIR}/MacOS/launch"
 
-# Copy Python script
-echo "📋 Copying Python script..."
+# Copy the app: entry point, package, roster, sound clips.
+# Deliberately NOT .env -- keys belong in ~/.hockey_music/.env so the bundle
+# stays safe to hand to another parent running the box.
+echo "📋 Copying application files..."
 cp hockey_music_controller.py "${APP_DIR}/Resources/"
+cp -R hockeymusic "${APP_DIR}/Resources/"
+[ -d rosters ] && cp -R rosters "${APP_DIR}/Resources/"
+[ -d sound_clips ] && cp -R sound_clips "${APP_DIR}/Resources/"
+find "${APP_DIR}/Resources" -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null
 
 # Create Info.plist
 echo "⚙️  Creating Info.plist..."
@@ -70,9 +76,9 @@ cat > "${APP_DIR}/Info.plist" << 'EOF'
     <key>CFBundleDisplayName</key>
     <string>Hockey Music Controller</string>
     <key>CFBundleVersion</key>
-    <string>1.0</string>
+    <string>3.0</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
+    <string>3.0</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>LSMinimumSystemVersion</key>

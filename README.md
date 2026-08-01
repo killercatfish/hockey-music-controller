@@ -188,6 +188,16 @@ dashboard exactly.
 
 ---
 
+## 📚 More docs
+
+- [docs/HUME_VOICE_SETUP.md](docs/HUME_VOICE_SETUP.md) — custom voice, API key, pre-rendering
+- [docs/CLIP_POINTS.md](docs/CLIP_POINTS.md) — start and end points
+- [docs/SPOTIFY_TO_APPLE_MUSIC.md](docs/SPOTIFY_TO_APPLE_MUSIC.md) — playlist migration
+- [rosters/README.md](rosters/README.md) — roster CSV format
+- [CLAUDE.md](CLAUDE.md) — architecture and invariants, for anyone changing the code
+
+---
+
 ## 📝 License
 
 MIT — see [LICENSE](LICENSE).

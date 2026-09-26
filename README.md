@@ -12,6 +12,10 @@ and gives every kid on the roster their own goal song.
 
 ---
 
+> **New to this and not a terminal person?** Read
+> [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md): download the ZIP,
+> double-click `Start Hockey Music.command`, done.
+
 ## ✨ What it does
 
 ### Every player gets their moment

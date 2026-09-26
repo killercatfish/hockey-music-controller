@@ -66,7 +66,7 @@ class RosterEditor:
         ttk.Button(buttons, text="🗑️ Remove", command=self._remove).pack(side=tk.LEFT)
         ttk.Button(buttons, text="Close", command=self.win.destroy).pack(side=tk.RIGHT)
         tk.Button(buttons, text="💾 Save roster", command=self._save,
-                  font=("Arial", 11, "bold"), bg="#2E86DE", fg="white"
+                  font=("Arial", 11, "bold"), bg="#2E86DE", fg="#111111"
                   ).pack(side=tk.RIGHT, padx=8)
 
     # -- data -------------------------------------------------------------
@@ -190,7 +190,7 @@ class PlayerForm:
         buttons = ttk.Frame(frame)
         buttons.grid(row=len(rows) + 1, column=0, columnspan=2, sticky=tk.EW)
         tk.Button(buttons, text="Save", command=self._save, font=("Arial", 11, "bold"),
-                  bg="#2E86DE", fg="white").pack(side=tk.RIGHT)
+                  bg="#2E86DE", fg="#111111").pack(side=tk.RIGHT)
         ttk.Button(buttons, text="Cancel",
                    command=self.win.destroy).pack(side=tk.RIGHT, padx=8)
 

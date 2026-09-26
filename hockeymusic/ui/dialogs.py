@@ -48,7 +48,7 @@ class FinalScoreDialog:
         buttons = ttk.Frame(frame)
         buttons.pack(fill=tk.X, pady=(14, 0))
         tk.Button(buttons, text="🎤 ANNOUNCE FINAL SCORE", command=self.announce,
-                  font=("Arial", 13, "bold"), bg="#9B59B6", fg="white", height=2
+                  font=("Arial", 13, "bold"), bg="#9B59B6", fg="#111111", height=2
                   ).pack(side=tk.LEFT, expand=True, fill=tk.X)
         ttk.Button(buttons, text="Cancel",
                    command=self.win.destroy).pack(side=tk.LEFT, padx=(8, 0))
@@ -95,7 +95,7 @@ class SettingsDialog:
         buttons = ttk.Frame(self.win, padding=(10, 0, 10, 10))
         buttons.pack(fill=tk.X)
         tk.Button(buttons, text="💾 Save", command=self._save,
-                  font=("Arial", 11, "bold"), bg="#2E86DE", fg="white"
+                  font=("Arial", 11, "bold"), bg="#2E86DE", fg="#111111"
                   ).pack(side=tk.RIGHT)
         ttk.Button(buttons, text="Close",
                    command=self.win.destroy).pack(side=tk.RIGHT, padx=8)
@@ -282,7 +282,7 @@ class PrerenderDialog:
         buttons.pack(fill=tk.X, pady=(14, 0))
         self.run_button = tk.Button(buttons, text="⚡ Render", command=self._start,
                                     font=("Arial", 12, "bold"),
-                                    bg="#27AE60", fg="white")
+                                    bg="#27AE60", fg="#111111")
         self.run_button.pack(side=tk.LEFT)
         ttk.Button(buttons, text="Close", command=self._close).pack(side=tk.RIGHT)
 
@@ -391,7 +391,7 @@ class ClipDialog:
         buttons = ttk.Frame(frame)
         buttons.pack(fill=tk.X, pady=(16, 0))
         tk.Button(buttons, text="Save", command=self._save, font=("Arial", 11, "bold"),
-                  bg="#2E86DE", fg="white").pack(side=tk.RIGHT)
+                  bg="#2E86DE", fg="#111111").pack(side=tk.RIGHT)
         ttk.Button(buttons, text="Cancel", command=self.win.destroy).pack(side=tk.RIGHT,
                                                                           padx=8)
         ttk.Button(buttons, text="Clear clip", command=self._clear).pack(side=tk.LEFT)

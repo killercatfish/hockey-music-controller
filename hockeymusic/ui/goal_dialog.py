@@ -89,7 +89,7 @@ class GoalDialog:
         buttons = ttk.Frame(frame)
         buttons.pack(fill=tk.X, pady=(14, 0))
         tk.Button(buttons, text="🎤 ANNOUNCE GOAL", command=self.announce,
-                  font=("Arial", 15, "bold"), bg="#FF6B6B", fg="white",
+                  font=("Arial", 15, "bold"), bg="#FF6B6B", fg="#111111",
                   height=2).pack(side=tk.LEFT, expand=True, fill=tk.X)
         ttk.Button(buttons, text="Cancel",
                    command=self.win.destroy).pack(side=tk.LEFT, padx=(8, 0))

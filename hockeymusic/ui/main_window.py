@@ -104,11 +104,11 @@ class HockeyMusicApp:
 
         situations = ttk.Frame(parent)
         situations.pack(fill=tk.X, pady=4)
-        tk.Button(situations, text="⚡ Power Play", bg="#FF6B6B", fg="white",
+        tk.Button(situations, text="⚡ Power Play", bg="#FF6B6B", fg="#111111",
                   font=("Arial", 12, "bold"), relief=tk.RAISED, bd=4,
                   command=lambda: self.play_event("power_play", "Power Play")
                   ).pack(side=tk.LEFT, padx=4, expand=True, fill=tk.X)
-        tk.Button(situations, text="🛡️ Penalty Kill", bg="#4ECDC4", fg="white",
+        tk.Button(situations, text="🛡️ Penalty Kill", bg="#4ECDC4", fg="#111111",
                   font=("Arial", 12, "bold"), relief=tk.RAISED, bd=4,
                   command=lambda: self.play_event("penalty_kill", "Penalty Kill")
                   ).pack(side=tk.LEFT, padx=4, expand=True, fill=tk.X)
@@ -122,7 +122,7 @@ class HockeyMusicApp:
             ("🏁 Final Score", "#9B59B6", lambda: FinalScoreDialog(self)),
         ]
         for label, colour, command in specs:
-            tk.Button(row, text=label, command=command, bg=colour, fg="white",
+            tk.Button(row, text=label, command=command, bg=colour, fg="#111111",
                       font=("Arial", 12, "bold"), relief=tk.RAISED, bd=4
                       ).pack(side=tk.LEFT, padx=4, expand=True, fill=tk.X)
 

@@ -141,6 +141,35 @@ class TestMainWindow(UITestCase):
         self.pump()
         self.assertEqual(self.app.listbox.size(), 24)
 
+    def test_space_plays_then_stops_and_queues_next(self):
+        app, music = self.app, self.app.music
+        app.position = 3
+        app.space_key()
+        self.assertTrue(music.playing)
+        self.assertEqual(music.played[-1][1], app.pool.music_index(3))
+        app.space_key()
+        self.assertFalse(music.playing)
+        self.assertEqual(app.position, 4)
+        app.space_key()
+        self.assertEqual(music.played[-1][1], app.pool.music_index(4))
+
+    def test_arrows_move_the_queue_and_enter_plays_it(self):
+        app = self.app
+        app.position = 0
+        app.move_queue(-1)
+        self.assertEqual(app.position, 0)          # clamped at the top
+        app.move_queue(1)
+        app.move_queue(1)
+        self.assertEqual(app.position, 2)
+        self.assertEqual(app.listbox.curselection(), (2,))
+        app.play_queued()
+        self.assertEqual(app.music.played[-1][1], app.pool.music_index(2))
+        # With a search filter, arrows walk the visible rows only.
+        app.search_var.set("Song 2")
+        self.pump()
+        app.move_queue(1)
+        self.assertEqual(app.pool.track_at(app.position), "Song 20 | Artist 0")
+
     def test_rows_show_track_length(self):
         self.pump()
         self.assertIn("(3:20)", self.app.listbox.get(0))

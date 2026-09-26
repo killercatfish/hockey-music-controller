@@ -203,7 +203,7 @@ class HockeyMusicApp:
         self.listbox.bind("<Button-3>", self._context_menu)
         self.listbox.bind("<ButtonPress-1>", self._drag_start)
         self.listbox.bind("<B1-Motion>", self._drag_motion)
-        self.listbox.bind("<ButtonRelease-1>", lambda e: setattr(self, "_drag_from", None))
+        self.listbox.bind("<ButtonRelease-1>", self._click_release)
 
     def _build_footer(self):
         footer = ttk.Frame(self.root, padding=(10, 0, 10, 10))
@@ -219,13 +219,17 @@ class HockeyMusicApp:
         ttk.Label(footer, textvariable=self.status_var, font=("Arial", 10),
                   foreground="#0a6", wraplength=920).pack(anchor="w")
         ttk.Label(footer, font=("Arial", 9, "italic"), foreground="#555",
-                  text="SPACE Play/Pause · G Goal · N Next · S Stop · "
-                       "O Power play · P Penalty kill · A Announce goal · L Lineup"
+                  text="SPACE Play / Stop+queue next · ↑↓ Pick · ENTER Play · "
+                       "G Goal · N Next · S Stop · O Power play · P Penalty kill · "
+                       "A Announce goal · L Lineup"
                   ).pack(anchor="w")
 
     def _bind_shortcuts(self):
         actions = {
-            "space": self.play_pause,
+            "space": self.space_key,
+            "Return": self.play_queued,
+            "Up": lambda: self.move_queue(-1),
+            "Down": lambda: self.move_queue(1),
             "g": self.play_goal_song,
             "n": self.next_track,
             "s": self.stop,
@@ -235,7 +239,8 @@ class HockeyMusicApp:
             "l": self.announce_lineup,
         }
         for key, action in actions.items():
-            for variant in ({key} if key == "space" else {key, key.upper()}):
+            single_letter = len(key) == 1
+            for variant in ({key, key.upper()} if single_letter else {key}):
                 self.root.bind(f"<{variant}>", self._shortcut(action))
 
     def _shortcut(self, action):
@@ -416,6 +421,15 @@ class HockeyMusicApp:
         self.listbox.selection_clear(0, tk.END)
         self.listbox.selection_set(to_row)
 
+    def _click_release(self, event):
+        """A click (or the end of a drag) queues the row under the pointer."""
+        self._drag_from = None
+        row = self.listbox.nearest(event.y)
+        if 0 <= row < len(self.visible):
+            self.position = self.visible[row]
+            self._highlight()
+            self._update_up_next()
+
     def _context_menu(self, event):
         row = self.listbox.nearest(event.y)
         if row < 0 or row >= len(self.visible):
@@ -514,6 +528,28 @@ class HockeyMusicApp:
             else:
                 self.music.set_volume(self.music.base_volume)
                 self.music.play_pause()
+
+    def space_key(self):
+        """Space at the box: playing -> stop and queue the next song;
+        silent -> play the queued song. One key, whistle to whistle."""
+        if self.music.is_playing():
+            self.next_track()
+        else:
+            self.play_queued()
+
+    def play_queued(self):
+        self.play_at(self.position)
+
+    def move_queue(self, step):
+        """↑/↓: move the queued song through the visible list without playing."""
+        if not self.visible:
+            return
+        row = self.visible.index(self.position) if self.position in self.visible else 0
+        row = max(0, min(row + step, len(self.visible) - 1))
+        self.position = self.visible[row]
+        self._highlight()
+        self._update_up_next()
+        self.status_var.set(f"Queued: {self.pool.track_at(self.position)}")
 
     def stop(self):
         """Hard stop, no fade -- when the whistle goes, the music goes."""

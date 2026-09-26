@@ -177,7 +177,7 @@ class HockeyMusicApp:
         ttk.Button(tools, text="⏏ Play from top",
                    command=self.play_from_top).pack(side=tk.LEFT)
         ttk.Label(tools, text="Search:").pack(side=tk.LEFT, padx=(16, 4))
-        search = ttk.Entry(tools, textvariable=self.search_var, width=24)
+        search = self.search_entry = ttk.Entry(tools, textvariable=self.search_var, width=24)
         search.pack(side=tk.LEFT)
         self.search_var.trace_add("write", lambda *_: self.refresh_playlist_view())
         ttk.Button(tools, text="✕", width=3,
@@ -219,7 +219,7 @@ class HockeyMusicApp:
         ttk.Label(footer, textvariable=self.status_var, font=("Arial", 10),
                   foreground="#0a6", wraplength=920).pack(anchor="w")
         ttk.Label(footer, font=("Arial", 9, "italic"), foreground="#555",
-                  text="SPACE Play / Stop+queue next · ↑↓ Pick · ENTER Play · "
+                  text="SPACE Play / Stop+queue next · ↑↓ Pick · ENTER Play · ESC Leave box · "
                        "G Goal · N Next · S Stop · O Power play · P Penalty kill · "
                        "A Announce goal · L Lineup"
                   ).pack(anchor="w")
@@ -242,6 +242,22 @@ class HockeyMusicApp:
             single_letter = len(key) == 1
             for variant in ({key, key.upper()} if single_letter else {key}):
                 self.root.bind(f"<{variant}>", self._shortcut(action))
+        # Esc always hands the keyboard back to the game keys, wherever focus is.
+        self.root.bind("<Escape>", lambda e: self._release_focus())
+        # Buttons and pickers keep focus after a click; Space on a focused
+        # button would fire the button as well as the game key. Give it back.
+        self.root.bind_all("<ButtonRelease-1>", self._after_click, add="+")
+
+    def _after_click(self, event):
+        w = event.widget
+        if isinstance(w, (tk.Button, ttk.Button, ttk.Combobox)):
+            self.root.after_idle(self._release_focus)
+
+    def _release_focus(self):
+        try:
+            self.root.focus_set()
+        except tk.TclError:
+            pass
 
     def _shortcut(self, action):
         """Wrap an action so it never fires while the operator is typing."""
@@ -292,6 +308,7 @@ class HockeyMusicApp:
             self.config.save()
 
     def assign_playlist(self):
+        self._release_focus()
         choice = self.playlist_combo.get()
         if choice == self.SHOW_ALL_PLAYLISTS:
             self.playlist_combo.set(self.pool.playlist)
@@ -320,6 +337,7 @@ class HockeyMusicApp:
                                  f"No tracks found in “{self.pool.playlist}”.")
 
     def switch_pool(self):
+        self._release_focus()
         self.pools.activate(self.pool_var.get())
         self.position = 0
         self.playlist_combo.set(self.pool.playlist)

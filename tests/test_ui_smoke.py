@@ -169,6 +169,22 @@ class TestMainWindow(UITestCase):
         app.space_key()
         self.assertEqual(music.played[-1][1], app.pool.music_index(4))
 
+    def test_space_works_with_focus_in_a_picker_but_not_in_search(self):
+        from hockeymusic.ui import common
+        app = self.app
+        self.assertFalse(common.is_typing(app.pool_combo))       # read-only picker
+        self.assertFalse(common.is_typing(app.playlist_combo))
+        self.assertTrue(common.is_typing(app.search_entry))
+        # The shortcut wrapper fires for the picker and stays quiet for search.
+        fired = []
+        handler = app._shortcut(lambda: fired.append(1))
+        class Ev: pass
+        ev = Ev(); ev.widget = app.pool_combo
+        self.assertEqual(handler(ev), "break")
+        ev.widget = app.search_entry
+        self.assertIsNone(handler(ev))
+        self.assertEqual(fired, [1])
+
     def test_space_stops_when_music_state_is_unknown(self):
         app, music = self.app, self.app.music
         music.playing = True

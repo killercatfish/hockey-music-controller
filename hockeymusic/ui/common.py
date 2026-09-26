@@ -43,4 +43,11 @@ def is_typing(widget):
     Guards the single-letter game shortcuts so typing a jersey number or a
     song title doesn't fire the goal horn.
     """
-    return isinstance(widget, (tk.Entry, ttk.Entry, tk.Text, ttk.Combobox, tk.Spinbox))
+    if isinstance(widget, ttk.Combobox):
+        # A read-only picker (pool, playlist) takes no typed text, but it keeps
+        # keyboard focus after a pick -- that swallowed Space at the rink.
+        try:
+            return "readonly" not in str(widget.cget("state"))
+        except tk.TclError:
+            return True
+    return isinstance(widget, (tk.Entry, ttk.Entry, tk.Text, tk.Spinbox))

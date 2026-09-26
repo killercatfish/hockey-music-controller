@@ -312,5 +312,32 @@ class TestStitch(unittest.TestCase):
             self.assertEqual(a.combined(ann, woo), first)      # cache hit
             self.assertIsNone(a.combined(ann, d / "nope.m4a"))
 
+
+class TestNoRobotVoice(unittest.TestCase):
+    """A line Hume can't produce is skipped, not read by the macOS voice."""
+
+    def _run(self, fallback_enabled):
+        from hockeymusic import announcer as mod
+        calls = []
+        a = mod.Announcer(Config({"announcer": {"fallback_enabled": fallback_enabled}}))
+        a.render = lambda text, force=False: None
+        real_run = mod.subprocess.run
+        mod.subprocess.run = lambda cmd, **kw: calls.append(cmd[0])
+        try:
+            status = []
+            a._play_one("Patriots GOAL!!", "/nonexistent/woo.m4a", status.append)
+        finally:
+            mod.subprocess.run = real_run
+        return calls, status
+
+    def test_default_skips(self):
+        calls, status = self._run(False)
+        self.assertEqual(calls, [])
+        self.assertTrue(status[-1].startswith("⛔ Not announced"))
+
+    def test_opt_in_uses_say(self):
+        calls, _ = self._run(True)
+        self.assertEqual(calls, ["say"])
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

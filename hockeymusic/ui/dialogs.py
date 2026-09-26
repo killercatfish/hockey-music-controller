@@ -199,6 +199,12 @@ class SettingsDialog:
         ttk.Entry(tab, textvariable=self.default_clip, width=24
                   ).grid(row=3, column=1, sticky=tk.W, padx=8)
 
+        self.fallback_enabled = tk.BooleanVar(
+            value=cfg.get("announcer.fallback_enabled", False))
+        ttk.Checkbutton(tab, text="If Hume can't render a line, say it in a macOS voice "
+                                  "(off: skip the announcement)",
+                        variable=self.fallback_enabled
+                        ).grid(row=7, column=0, columnspan=2, sticky=tk.W, pady=(14, 0))
         self.fallback_voice = tk.StringVar(
             value=cfg.get("announcer.fallback_voice", "Alex"))
         ttk.Label(tab, text="Fallback macOS voice:").grid(row=4, column=0,
@@ -235,6 +241,7 @@ class SettingsDialog:
         cfg.set("announcer.timeout", float(self.timeout.get()))
         cfg.set("announcer.default_celebration", self.default_clip.get().strip())
         cfg.set("announcer.fallback_voice", self.fallback_voice.get())
+        cfg.set("announcer.fallback_enabled", bool(self.fallback_enabled.get()))
         cfg.save()
         self.app.apply_settings()
         self.win.destroy()

@@ -145,6 +145,11 @@ class Announcer:
         return True
 
     @property
+    def can_render(self):
+        """True if an uncached line has a real chance of coming out of Hume now."""
+        return self.hume_available and not self.quota_exhausted
+
+    @property
     def status_text(self):
         if self.hume_available and self.quota_exhausted:
             return "macOS voice (Hume quota exhausted -- check your Hume plan)"
@@ -295,6 +300,12 @@ class Announcer:
         audio = self.render(text) if self.config.get("announcer.use_cache", True) \
             else self.render(text, force=True)
 
+        if not audio and not self.config.get("announcer.fallback_enabled", False):
+            # Josh would rather a goal go unannounced than robot-voiced. Leave
+            # the music alone too -- nothing is going to play.
+            status(f"⛔ Not announced (no Hume audio): {text}")
+            return
+
         ducked = self._duck()
         try:
             if audio:
@@ -304,7 +315,6 @@ class Announcer:
                 if combo:
                     celebration = None          # already played, gap-free
             else:
-                # Hume unavailable -- the show still goes on.
                 voice = self.config.get("announcer.fallback_voice", "Alex")
                 subprocess.run(["say", "-v", voice, text], check=False)
                 status(f"📢 (macOS voice) {text}")

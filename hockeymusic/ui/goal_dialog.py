@@ -140,11 +140,17 @@ class GoalDialog:
         self.preview.config(text=text or "Enter the scorer's number")
 
         if text:
-            cached = self.app.announcer.is_cached(text)
-            self.cache_label.config(
-                text="⚡ Cached — plays instantly, no wifi needed" if cached
-                else "☁️ Not cached — will render from Hume (needs wifi)",
-                foreground="#0a6" if cached else "#c60")
+            ann = self.app.announcer
+            if ann.is_cached(text):
+                msg, colour = "⚡ Cached — plays instantly, no wifi needed", "#0a6"
+            elif ann.can_render:
+                msg, colour = "☁️ Not cached — will render from Hume (needs wifi)", "#c60"
+            elif self.app.config.get("announcer.fallback_enabled", False):
+                msg, colour = "🤖 Not cached and Hume is unavailable — macOS voice", "#c60"
+            else:
+                msg, colour = ("⛔ Not cached and Hume is unavailable — this call will be "
+                               "SKIPPED. Clear the assists to use the cached unassisted call."), "#c00"
+            self.cache_label.config(text=msg, foreground=colour)
         else:
             self.cache_label.config(text="")
 

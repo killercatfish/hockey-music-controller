@@ -51,6 +51,7 @@ DEFAULTS = {
         "use_cache": True,
         "timeout": 20.0,
         "fallback_voice": "Alex",
+        "fallback_enabled": False,   # off: a line Hume can't render is skipped, not robot-voiced
         "default_celebration": "woo.m4a",
         "play_song_on_announce": False,  # the GOAL button already played it
     },

@@ -198,7 +198,6 @@ class HockeyMusicApp:
         scroll.config(command=self.listbox.yview)
 
         self.listbox.bind("<Double-Button-1>", lambda e: self.play_selected())
-        self.listbox.bind("<Return>", lambda e: self.play_selected())
         self.listbox.bind("<Button-2>", self._context_menu)
         self.listbox.bind("<Control-Button-1>", self._context_menu)
         self.listbox.bind("<Button-3>", self._context_menu)

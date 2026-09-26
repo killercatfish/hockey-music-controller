@@ -51,6 +51,7 @@ class AppleMusicController:
         # Music's own volume is shared by fades and ducking, so serialise access
         # and remember what the operator actually set it to.
         self._vol_lock = threading.RLock()
+        self._fading = False
         self._base_volume = None
         self._fade_generation = 0
         # Music.app serialises AppleScript. Without this, the once-a-second UI
@@ -336,8 +337,12 @@ class AppleMusicController:
             return self._base_volume
 
     def remember_base_volume(self):
-        """Snapshot the operator's current volume as the level to restore to."""
+        """Snapshot the operator's current volume as the level to restore to.
+        Skipped while a fade is stepping, or a second Space mid-fade would
+        make the half-faded level the new normal."""
         with self._vol_lock:
+            if self._fading:
+                return self._base_volume
             current = self.get_volume()
             if current is not None:
                 self._base_volume = current
@@ -347,6 +352,7 @@ class AppleMusicController:
         """Invalidate any in-flight fade so it stops stepping."""
         with self._vol_lock:
             self._fade_generation += 1
+            self._fading = False
 
     def fade(self, target, duration, steps=12, then=None):
         """Ramp Music's volume to `target` over `duration` seconds, off-thread.
@@ -357,19 +363,25 @@ class AppleMusicController:
         with self._vol_lock:
             self._fade_generation += 1
             generation = self._fade_generation
+            self._fading = True
             start = self.get_volume()
         if start is None:
             start = self.base_volume
 
         def worker():
             delay = max(0.0, duration / max(1, steps))
-            for i in range(1, steps + 1):
+            try:
+                for i in range(1, steps + 1):
+                    with self._vol_lock:
+                        if generation != self._fade_generation:
+                            return  # superseded
+                    self.set_volume(start + (target - start) * i / steps)
+                    if delay:
+                        time.sleep(delay)
+            finally:
                 with self._vol_lock:
-                    if generation != self._fade_generation:
-                        return  # superseded
-                self.set_volume(start + (target - start) * i / steps)
-                if delay:
-                    time.sleep(delay)
+                    if generation == self._fade_generation:
+                        self._fading = False
             if then:
                 then()
 

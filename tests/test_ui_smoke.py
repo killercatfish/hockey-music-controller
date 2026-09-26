@@ -185,6 +185,21 @@ class TestMainWindow(UITestCase):
         self.assertIsNone(handler(ev))
         self.assertEqual(fired, [1])
 
+    def test_enter_plays_the_queued_song_once(self):
+        app = self.app
+        # The list must not have its own Enter binding: the window-level one
+        # fires too, and the song started twice (an audible restart).
+        self.assertEqual(app.listbox.bind("<Return>"), "")
+        self.assertNotEqual(app.root.bind("<Return>"), "")
+        app.position = 2
+        before = len(app.music.played)
+        class Ev: pass
+        ev = Ev(); ev.widget = app.listbox
+        app._shortcut(app.play_queued)(ev)
+        played = app.music.played[before:]
+        self.assertEqual(len(played), 1, played)
+        self.assertEqual(played[0][1], app.pool.music_index(2))
+
     def test_space_stops_when_music_state_is_unknown(self):
         app, music = self.app, self.app.music
         music.playing = True

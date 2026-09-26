@@ -337,7 +337,7 @@ class HockeyMusicApp:
     def _row_text(self, pos):
         track = self.pool.track_at(pos)
         marks = []
-        clip = self.pool.clip_for(track)
+        clip = self.pools.clip_for(track, self.pool)
         if clip and clip.is_set:
             window = format_seconds(clip.start)
             if clip.end is not None:
@@ -391,10 +391,10 @@ class HockeyMusicApp:
         menu.add_command(label="▶ Play now", command=lambda: self.play_at(pos))
         menu.add_command(label="⏭ Queue as next", command=lambda: self.queue_at(pos))
         menu.add_separator()
-        clip = self.pool.clip_for(track)
+        clip = self.pools.clip_for(track, self.pool)
         label = "✏️ Edit clip points" if clip and clip.is_set else "⏱️ Set clip points"
         menu.add_command(label=label, command=lambda: ClipDialog(self, self.pool, track))
-        if clip and clip.is_set:
+        if self.pool.clip_for(track):
             menu.add_command(label="🗑️ Clear clip points",
                              command=lambda: self._clear_clip(track))
         menu.add_separator()
@@ -437,7 +437,7 @@ class HockeyMusicApp:
         pos = max(0, min(pos, len(self.pool.order) - 1))
         self.position = pos
         track = self.pool.track_at(pos)
-        clip = self.pool.clip_for(track)
+        clip = self.pools.clip_for(track, self.pool)
 
         self.music.cancel_fades()
         self.music.set_volume(self.music.base_volume)

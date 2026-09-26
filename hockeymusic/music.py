@@ -17,13 +17,13 @@ def _escape(s):
     return str(s).replace("\\", "\\\\").replace('"', '\\"')
 
 
-def run_applescript(script, max_retries=3, retry_delay=0.5, silent=False):
+def run_applescript(script, max_retries=3, retry_delay=0.5, silent=False, timeout=30):
     """Execute AppleScript. Returns (stdout, ok)."""
     for attempt in range(max_retries):
         try:
             result = subprocess.run(
                 ["osascript", "-e", script],
-                capture_output=True, text=True, timeout=30,
+                capture_output=True, text=True, timeout=timeout,
             )
             if result.returncode == 0:
                 return result.stdout.strip(), True
@@ -110,6 +110,78 @@ class AppleMusicController:
                         if n.strip()]
         return self._get_playlist_tracks_slow(playlist_name)
 
+    def get_playlist_track_meta(self, playlist_name):
+        """Return [{"track", "name", "artist", "album", "duration", "cloud"}, ...].
+
+        Same bulk-read trick as `get_playlist_tracks`, and the same "Name |
+        Artist" key -- so a row here lines up with the pool's clips. Used by the
+        hype-point lookup and the game-playlist generator, not by the UI.
+        """
+        name = _escape(playlist_name)
+        script = f'''
+        tell application "Music"
+            set pl to playlist "{name}"
+            set AppleScript's text item delimiters to "{_FIELD_SEP}"
+            return ((name of every track of pl) as text) & "{_LIST_SEP}" & ¬
+                ((artist of every track of pl) as text) & "{_LIST_SEP}" & ¬
+                ((album of every track of pl) as text) & "{_LIST_SEP}" & ¬
+                ((duration of every track of pl) as text) & "{_LIST_SEP}" & ¬
+                ((cloud status of every track of pl) as text)
+        end tell
+        '''
+        out, ok = self._run(script)
+        if not (ok and out):
+            return []
+        columns = [c.split(_FIELD_SEP) for c in out.split(_LIST_SEP)]
+        if len(columns) != 5 or len({len(c) for c in columns}) != 1:
+            return []
+        rows = []
+        for n, a, album, dur, cloud in zip(*columns):
+            if not n.strip():
+                continue
+            try:
+                duration = float(dur)
+            except ValueError:
+                duration = None
+            rows.append({"track": f"{n.strip()} | {a.strip()}", "name": n.strip(),
+                         "artist": a.strip(), "album": album.strip(),
+                         "duration": duration, "cloud": cloud.strip()})
+        return rows
+
+    def playlist_exists(self, playlist_name):
+        out, ok = self._run(
+            f'tell application "Music" to return exists user playlist "{_escape(playlist_name)}"')
+        return ok and out == "true"
+
+    def create_playlist_from(self, source_playlist, new_name, track_indices, chunk=40):
+        """Make a new user playlist holding the given (1-indexed) tracks of another.
+
+        Refuses to touch an existing playlist of that name. Copies in chunks so
+        no single AppleScript call runs long enough to time out.
+        """
+        if self.playlist_exists(new_name):
+            print(f"❌ Playlist “{new_name}” already exists; not touching it")
+            return False
+        src, dst = _escape(source_playlist), _escape(new_name)
+        _, ok = self._run(
+            f'tell application "Music" to make new user playlist with properties {{name:"{dst}"}}')
+        if not ok:
+            return False
+        for i in range(0, len(track_indices), chunk):
+            indices = ", ".join(str(int(x)) for x in track_indices[i:i + chunk])
+            script = f'''
+            tell application "Music"
+                repeat with i in {{{indices}}}
+                    duplicate track i of playlist "{src}" to playlist "{dst}"
+                end repeat
+            end tell
+            '''
+            _, ok = self._run(script, max_retries=1, timeout=120)
+            if not ok:
+                print(f"❌ Copying tracks into “{new_name}” failed partway")
+                return False
+        return True
+
     def _get_playlist_tracks_slow(self, playlist_name):
         """Per-track fallback for the rare playlist the bulk read chokes on."""
         script = f'''
@@ -131,29 +203,44 @@ class AppleMusicController:
 
     def play_track_from_playlist(self, playlist_name, track_index, start_time=None):
         """Play track `track_index` (1-indexed) of a playlist, optionally seeking."""
-        seek = ""
-        if start_time:
-            seek = f"\n            delay 0.4\n            set player position to {int(start_time)}"
-        script = f'''
-        tell application "Music"
-            play track {int(track_index)} of playlist "{_escape(playlist_name)}"{seek}
-        end tell
-        '''
-        _, ok = self._run(script)
+        ok = self._run(f'tell application "Music" to play track {int(track_index)} '
+                       f'of playlist "{_escape(playlist_name)}"')[1]
         if not ok:
             print(f"❌ Could not play track {track_index} of '{playlist_name}'")
+        elif start_time:
+            self._seek_verified(start_time)
         return ok
 
     def play_track_by_name(self, track_name, start_time=None):
-        seek = ""
-        if start_time:
-            seek = f"\n            delay 0.4\n            set player position to {int(start_time)}"
-        script = f'''
-        tell application "Music"
-            play track "{_escape(track_name)}"{seek}
-        end tell
-        '''
-        return self._run(script)[1]
+        ok = self._run(f'tell application "Music" to play track "{_escape(track_name)}"')[1]
+        if ok and start_time:
+            self._seek_verified(start_time)
+        return ok
+
+    def _seek_verified(self, seconds, attempts=8, settle=0.25):
+        """Seek to `seconds` once the player is ready, and confirm it took.
+
+        Right after `play`, Music refuses `set player position` (error -10006)
+        until the track is loaded. The old code slept a fixed 0.4s and hoped;
+        when that missed, the retry re-issued `play` and the song restarted
+        from 0:00 before jumping -- an audible blip at the rink. Now the seek
+        is retried on its own, and the position is read back to prove it.
+        """
+        target = int(seconds)
+        for _ in range(attempts):
+            _, ok = self._run(f'tell application "Music" to set player position to {target}',
+                              max_retries=1, silent=True)
+            if ok:
+                out, ok = self._run('tell application "Music" to get player position',
+                                    max_retries=1, silent=True)
+                try:
+                    if ok and abs(float(out) - target) <= 3:
+                        return True
+                except ValueError:
+                    pass
+            time.sleep(settle)
+        print(f"⚠️  Could not seek to {target}s; playing from wherever Music started")
+        return False
 
     def play_pause(self):
         return self._run('tell application "Music" to playpause')[1]

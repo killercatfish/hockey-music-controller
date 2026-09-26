@@ -178,5 +178,29 @@ class TestConfigMigration(unittest.TestCase):
         self.assertEqual(cfg.get("audio.fade_out"), 2.5)
 
 
+
+class TestClipSharing(unittest.TestCase):
+    """A clip set in one pool plays in every pool, unless that pool overrides it."""
+
+    def setUp(self):
+        self.pools = PoolSet(Config({"pools": {
+            "Stoppage": {"playlist": "A", "flagged": [],
+                         "clips": {"Song | Band": {"start": 29, "end": None}}},
+            "Game 1": {"playlist": "B", "flagged": [], "clips": {}},
+            "Warmup": {"playlist": "C", "flagged": [],
+                       "clips": {"Song | Band": {"start": 0, "end": 40}}},
+        }, "active_pool": "Game 1"}))
+
+    def test_inherits_from_another_pool(self):
+        clip = self.pools.clip_for("Song | Band")          # active = Game 1
+        self.assertEqual(clip.start, 29)
+
+    def test_own_clip_wins(self):
+        clip = self.pools.clip_for("Song | Band", self.pools.pools["Warmup"])
+        self.assertEqual((clip.start, clip.end), (0, 40))
+
+    def test_unknown_track_is_none(self):
+        self.assertIsNone(self.pools.clip_for("Other | Band"))
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

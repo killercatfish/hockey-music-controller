@@ -354,7 +354,7 @@ class ClipDialog:
         self.app = app
         self.pool = pool
         self.track = track
-        clip = pool.clip_for(track)
+        clip = app.pools.clip_for(track, pool)   # inherits another pool's clip
         self.win = modal(app.root, "Clip", "460x300")
 
         self.start = tk.StringVar(value=format_seconds(clip.start if clip else 0))

@@ -4,7 +4,7 @@ Game-day music and PA announcements for youth hockey. Drives Apple Music over
 AppleScript, announces goals in a custom [Hume AI](https://www.hume.ai) voice,
 and gives every kid on the roster their own goal song.
 
-![Version](https://img.shields.io/badge/version-3.0-blue)
+![Version](https://img.shields.io/badge/version-3.1-blue)
 ![Python](https://img.shields.io/badge/python-3.8+-green)
 ![Platform](https://img.shields.io/badge/platform-macOS-lightgrey)
 
@@ -38,6 +38,10 @@ and gives every kid on the roster their own goal song.
   one click instead of reloading a playlist between periods.
 - **Clip in *and* out points** — grab just the good 20 seconds of a track.
   Right-click → *Set clip points*, or capture the current playback position.
+- **Hype points** — `hype_points.py` finds every song's chorus from synced
+  lyrics and starts the clip there, so a stoppage opens on the hook, not the intro.
+- **One playlist per game** — `game_playlists.py` deals the master playlist into
+  disjoint decks for a doubleheader; clip points carry over.
 - **Fades instead of hard cuts** on every stop and skip.
 - **No-repeat shuffle** — keeps the last dozen tracks out of the front of the deck.
 - **Search/filter** the playlist without losing your place.

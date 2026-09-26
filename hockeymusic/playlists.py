@@ -178,6 +178,25 @@ class PoolSet:
             self.active_name = name
         return self.active
 
+    def clip_for(self, track, pool=None):
+        """The clip to play for a track: the pool's own, else any other pool's.
+
+        Clips are set once per song, not once per pool -- a second game-day
+        playlist built from the same songs should start them at the same hook
+        without redoing 450 clip points. The pool's own clip still wins, so a
+        Warmup pool can deliberately start a song from the top.
+        """
+        pool = pool or self.active
+        clip = pool.clip_for(track)
+        if clip:
+            return clip
+        for other in self.pools.values():
+            if other is not pool:
+                clip = other.clip_for(track)
+                if clip:
+                    return clip
+        return None
+
     def add(self, name, playlist=""):
         name = name.strip()
         if not name or name in self.pools:

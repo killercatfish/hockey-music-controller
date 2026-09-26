@@ -4,6 +4,8 @@
 |---|---|
 | [HUME_VOICE_SETUP.md](HUME_VOICE_SETUP.md) | Creating the custom voice, storing the API key, and **pre-rendering announcements** so they work without rink wifi |
 | [CLIP_POINTS.md](CLIP_POINTS.md) | Setting start and end points so a track plays only its good part |
+| [HYPE_POINTS.md](HYPE_POINTS.md) | `hype_points.py` — set every clip start at the chorus automatically, from synced lyrics |
+| [GAME_PLAYLISTS.md](GAME_PLAYLISTS.md) | `game_playlists.py` — one Apple Music playlist per game, no repeats, clips carried over |
 | [SPOTIFY_TO_APPLE_MUSIC.md](SPOTIFY_TO_APPLE_MUSIC.md) | Moving an existing Spotify playlist into Apple Music |
 
 Also useful:

@@ -217,6 +217,19 @@ class AppleMusicController:
             self._seek_verified(start_time)
         return ok
 
+    def play_playlist(self, playlist_name):
+        """Play a whole user playlist from its first track (Zamboni set etc)."""
+        return self._run(f'tell application "Music" to play user playlist '
+                         f'"{_escape(playlist_name)}"')[1]
+
+    def play_song_or_playlist(self, name):
+        """An event song may name a track OR a playlist. A playlist plays through
+        from the top; a track plays alone. Used by the event buttons and the
+        Settings ▶ Test button so both agree."""
+        if self.playlist_exists(name):
+            return self.play_playlist(name)
+        return self.play_track_by_name(name)
+
     def _seek_verified(self, seconds, attempts=8, settle=0.25):
         """Seek to `seconds` once the player is ready, and confirm it took.
 

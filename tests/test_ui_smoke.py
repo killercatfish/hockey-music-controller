@@ -27,6 +27,19 @@ class FakeMusic:
     def get_playlists(self):
         return ["Stoppage Music", "Warmups"]
 
+    def playlist_exists(self, name):
+        return name in self.get_playlists()
+
+    def play_playlist(self, name):
+        self.played.append(("playlist", name))
+        self.playing = True
+        return True
+
+    def play_song_or_playlist(self, name):
+        if self.playlist_exists(name):
+            return self.play_playlist(name)
+        return self.play_track_by_name(name)
+
     def get_playlist_tracks(self, _name):
         return list(self.tracks)
 
@@ -169,6 +182,15 @@ class TestMainWindow(UITestCase):
         self.pump()
         app.move_queue(1)
         self.assertEqual(app.pool.track_at(app.position), "Song 20 | Artist 0")
+
+    def test_event_button_plays_a_playlist_when_named_one(self):
+        app = self.app
+        app.config.set_event_song("zamboni", "Warmups")
+        app.play_event("zamboni", "Zamboni")
+        self.assertEqual(app.music.played[-1], ("playlist", "Warmups"))
+        app.config.set_event_song("zamboni", "Some Track")
+        app.play_event("zamboni", "Zamboni")
+        self.assertEqual(app.music.played[-1], ("Some Track", None))
 
     def test_rows_show_track_length(self):
         self.pump()

@@ -102,7 +102,8 @@ class SettingsDialog:
 
     def _songs_tab(self, parent):
         tab = ttk.Frame(parent, padding=14)
-        ttk.Label(tab, text="Type the exact track title as it appears in Apple Music.",
+        ttk.Label(tab, text="Type the exact track title as it appears in Apple Music, "
+                            "or a playlist name to play it all the way through.",
                   font=("Arial", 9, "italic"), foreground="#555"
                   ).grid(row=0, column=0, columnspan=3, sticky=tk.W, pady=(0, 10))
         for row, (key, label) in enumerate(EVENT_KEYS, start=1):
@@ -112,7 +113,7 @@ class SettingsDialog:
             ttk.Entry(tab, textvariable=var, width=44).grid(row=row, column=1,
                                                             padx=8, pady=5)
             ttk.Button(tab, text="▶ Test",
-                       command=lambda v=var: self.app.music.play_track_by_name(v.get())
+                       command=lambda v=var: self.app.music.play_song_or_playlist(v.get())
                        ).grid(row=row, column=2, padx=4)
         tab.columnconfigure(1, weight=1)
 

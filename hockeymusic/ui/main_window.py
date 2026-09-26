@@ -612,7 +612,7 @@ class HockeyMusicApp:
         self.active_clip = None
         self.music.cancel_fades()
         self.music.set_volume(self.music.base_volume)
-        if self.music.play_track_by_name(song):
+        if self.music.play_song_or_playlist(song):
             self.status_var.set(f"{label}: {song}")
         else:
             messagebox.showerror("Error", f"Could not play “{song}”. "

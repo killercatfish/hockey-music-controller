@@ -138,6 +138,22 @@ class TestMainWindow(UITestCase):
         self.pump()
         self.assertEqual(self.app.listbox.size(), 24)
 
+    def test_playlist_picker_shows_pool_playlists_then_expands(self):
+        app = self.app
+        app.refresh_playlists()
+        self.assertEqual(list(app.playlist_combo["values"]),
+                         ["Stoppage Music", app.SHOW_ALL_PLAYLISTS])
+        # Picking the sentinel expands to everything and leaves the pool alone.
+        app.playlist_combo.set(app.SHOW_ALL_PLAYLISTS)
+        app.assign_playlist()
+        self.assertEqual(list(app.playlist_combo["values"]), ["Stoppage Music", "Warmups"])
+        self.assertEqual(app.playlist_combo.get(), "Stoppage Music")
+        self.assertEqual(app.pool.playlist, "Stoppage Music")
+        # A pool whose playlist Music doesn't know is not listed.
+        app.pool.playlist = "Gone"
+        app.refresh_playlists()
+        self.assertEqual(list(app.playlist_combo["values"]), ["Stoppage Music", "Warmups"])
+
     def test_search_filters_the_view(self):
         self.app.search_var.set("Song 1")
         self.pump()

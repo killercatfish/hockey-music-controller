@@ -51,6 +51,7 @@ class HockeyMusicApp:
         if autostart:
             if self.pool.playlist:
                 self.load_pool_tracks(quiet=True)
+            self.refresh_playlists(quiet=True)
             self._sync_volume()
             self._tick()
 
@@ -250,16 +251,40 @@ class HockeyMusicApp:
     # Pools and the playlist view
     # =====================================================================
 
-    def refresh_playlists(self):
+    SHOW_ALL_PLAYLISTS = "— Show all playlists… —"
+
+    def refresh_playlists(self, show_all=False, quiet=False):
+        """Fill the playlist picker.
+
+        Music has ~200 user playlists (every album added from Apple Music
+        shows up as one), so by default the picker lists only the playlists a
+        pool already uses. Picking the last entry expands it to the full list;
+        ⟳ collapses it again.
+        """
         playlists = self.music.get_playlists()
         if not playlists:
-            messagebox.showerror("Error", "Could not read playlists. Is Music running?")
+            if not quiet:
+                messagebox.showerror("Error", "Could not read playlists. Is Music running?")
             return
-        self.playlist_combo["values"] = playlists
-        self.status_var.set(f"Found {len(playlists)} Apple Music playlists")
+        in_use = []
+        for pool in self.pools.pools.values():
+            if pool.playlist in playlists and pool.playlist not in in_use:
+                in_use.append(pool.playlist)
+        if show_all or not in_use:
+            self.playlist_combo["values"] = playlists
+            self.status_var.set(f"Showing all {len(playlists)} Apple Music playlists")
+        else:
+            self.playlist_combo["values"] = in_use + [self.SHOW_ALL_PLAYLISTS]
+            self.status_var.set(f"Showing the {len(in_use)} playlists your pools use "
+                                f"({len(playlists)} in Music)")
 
     def assign_playlist(self):
-        self.pool.playlist = self.playlist_combo.get()
+        choice = self.playlist_combo.get()
+        if choice == self.SHOW_ALL_PLAYLISTS:
+            self.playlist_combo.set(self.pool.playlist)
+            self.refresh_playlists(show_all=True)
+            return
+        self.pool.playlist = choice
         self.load_pool_tracks()
 
     def load_pool_tracks(self, quiet=False):

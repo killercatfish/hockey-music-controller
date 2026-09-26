@@ -41,8 +41,8 @@ DEFAULTS = {
     "known_playlists": [],   # every Apple Music playlist a pool has ever used
 
     "audio": {
-        "fade_in": 0.0,
-        "fade_out": 1.5,
+        "fade_in": 0.0,          # unused; kept so old configs still load
+        "fade_out": 0.0,         # instant stop; Settings can bring a fade back
         "duck_volume": 25,
         "duck_enabled": True,
         "announce_stops_music": True,   # stop the music for the PA, not just duck it

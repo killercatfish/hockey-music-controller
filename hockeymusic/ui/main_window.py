@@ -68,7 +68,7 @@ class HockeyMusicApp:
 
     @property
     def fade_out(self):
-        return float(self.config.get("audio.fade_out", 1.5))
+        return float(self.config.get("audio.fade_out", 0.0))
 
     # =====================================================================
     # Layout

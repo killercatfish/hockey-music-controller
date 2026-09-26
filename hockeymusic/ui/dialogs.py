@@ -131,7 +131,7 @@ class SettingsDialog:
         tab = ttk.Frame(parent, padding=14)
         cfg = self.app.config
 
-        self.fade_out = tk.DoubleVar(value=cfg.get("audio.fade_out", 1.5))
+        self.fade_out = tk.DoubleVar(value=cfg.get("audio.fade_out", 0.0))
         self.duck_volume = tk.IntVar(value=cfg.get("audio.duck_volume", 25))
         self.duck_enabled = tk.BooleanVar(value=cfg.get("audio.duck_enabled", True))
         self.stop_for_pa = tk.BooleanVar(value=cfg.get("audio.announce_stops_music", True))

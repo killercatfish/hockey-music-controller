@@ -266,17 +266,25 @@ class HockeyMusicApp:
             if not quiet:
                 messagebox.showerror("Error", "Could not read playlists. Is Music running?")
             return
-        in_use = []
         for pool in self.pools.pools.values():
-            if pool.playlist in playlists and pool.playlist not in in_use:
-                in_use.append(pool.playlist)
-        if show_all or not in_use:
+            self._remember_playlist(pool.playlist)
+        known = [p for p in self.config.get("known_playlists", []) if p in playlists]
+        if show_all or not known:
             self.playlist_combo["values"] = playlists
             self.status_var.set(f"Showing all {len(playlists)} Apple Music playlists")
         else:
-            self.playlist_combo["values"] = in_use + [self.SHOW_ALL_PLAYLISTS]
-            self.status_var.set(f"Showing the {len(in_use)} playlists your pools use "
+            self.playlist_combo["values"] = known + [self.SHOW_ALL_PLAYLISTS]
+            self.status_var.set(f"Showing the {len(known)} playlists your pools have used "
                                 f"({len(playlists)} in Music)")
+
+    def _remember_playlist(self, name):
+        """Keep a playlist in the short picker list once any pool has used it,
+        so re-pointing a pool doesn't make the old playlist vanish."""
+        known = list(self.config.get("known_playlists", []))
+        if name and name not in known:
+            known.append(name)
+            self.config.set("known_playlists", known)
+            self.config.save()
 
     def assign_playlist(self):
         choice = self.playlist_combo.get()
@@ -285,7 +293,9 @@ class HockeyMusicApp:
             self.refresh_playlists(show_all=True)
             return
         self.pool.playlist = choice
+        self._remember_playlist(choice)
         self.load_pool_tracks()
+        self.refresh_playlists()
 
     def load_pool_tracks(self, quiet=False):
         if not self.pool.playlist:

@@ -38,6 +38,8 @@ DEFAULTS = {
     "event_songs": {key: "" for key, _ in EVENT_KEYS},
     "pools": {},
     "active_pool": "",
+    "known_playlists": [],   # every Apple Music playlist a pool has ever used
+
     "audio": {
         "fade_in": 0.0,
         "fade_out": 1.5,

@@ -149,7 +149,15 @@ class TestMainWindow(UITestCase):
         self.assertEqual(list(app.playlist_combo["values"]), ["Stoppage Music", "Warmups"])
         self.assertEqual(app.playlist_combo.get(), "Stoppage Music")
         self.assertEqual(app.pool.playlist, "Stoppage Music")
-        # A pool whose playlist Music doesn't know is not listed.
+        # Re-pointing the pool keeps the old playlist in the short list.
+        app.playlist_combo.set("Warmups")
+        app.assign_playlist()
+        self.assertEqual(app.pool.playlist, "Warmups")
+        self.assertEqual(list(app.playlist_combo["values"]),
+                         ["Stoppage Music", "Warmups", app.SHOW_ALL_PLAYLISTS])
+        self.assertEqual(app.config.get("known_playlists"), ["Stoppage Music", "Warmups"])
+        # A remembered playlist Music no longer has is not listed.
+        app.config.set("known_playlists", ["Gone"])
         app.pool.playlist = "Gone"
         app.refresh_playlists()
         self.assertEqual(list(app.playlist_combo["values"]), ["Stoppage Music", "Warmups"])

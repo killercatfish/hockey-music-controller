@@ -243,5 +243,34 @@ class TestAnnouncerQuota(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         self.assertEqual((rendered, skipped, failed), (0, 0, 50))
 
+
+class TestAnnouncerStopsMusic(unittest.TestCase):
+    class Music:
+        def __init__(self): self.calls = []; self.playing = True
+        def is_playing(self): return self.playing
+        def cancel_fades(self): self.calls.append("cancel")
+        def stop(self): self.calls.append("stop"); self.playing = False
+        def duck(self, level): self.calls.append(("duck", level)); return 100
+        def unduck(self, restore_to=None, duration=0.6): self.calls.append("unduck")
+
+    def test_default_stops_the_music_and_never_restores(self):
+        from hockeymusic.announcer import Announcer
+        m = self.Music(); a = Announcer(Config({}), m)
+        prior = a._duck(); a._unduck(prior)
+        self.assertEqual(m.calls, ["cancel", "stop"])
+
+    def test_duck_mode_still_works(self):
+        from hockeymusic.announcer import Announcer
+        m = self.Music()
+        a = Announcer(Config({"audio": {"announce_stops_music": False, "duck_volume": 30}}), m)
+        prior = a._duck(); a._unduck(prior)
+        self.assertEqual(m.calls, [("duck", 30), "unduck"])
+
+    def test_nothing_playing_means_nothing_touched(self):
+        from hockeymusic.announcer import Announcer
+        m = self.Music(); m.playing = False
+        a = Announcer(Config({}), m)
+        self.assertIsNone(a._duck()); self.assertEqual(m.calls, [])
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

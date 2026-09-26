@@ -478,8 +478,12 @@ class HockeyMusicApp:
                 self.music.play_pause()
 
     def stop(self):
+        """Hard stop, no fade -- when the whistle goes, the music goes."""
         self.active_clip = None
-        self._fade_and(self.music.stop)
+        base = self.music.remember_base_volume()
+        self.music.cancel_fades()
+        self.music.stop()
+        self.music.set_volume(base)
         self.status_var.set("Stopped")
 
     def _fade_and(self, action):

@@ -43,6 +43,7 @@ DEFAULTS = {
         "fade_out": 1.5,
         "duck_volume": 25,
         "duck_enabled": True,
+        "announce_stops_music": True,   # stop the music for the PA, not just duck it
         "family_safe": False,
     },
     "announcer": {
@@ -51,6 +52,7 @@ DEFAULTS = {
         "timeout": 20.0,
         "fallback_voice": "Alex",
         "default_celebration": "woo.m4a",
+        "play_song_on_announce": False,  # the GOAL button already played it
     },
 }
 

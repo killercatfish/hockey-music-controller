@@ -133,6 +133,7 @@ class SettingsDialog:
         self.fade_out = tk.DoubleVar(value=cfg.get("audio.fade_out", 1.5))
         self.duck_volume = tk.IntVar(value=cfg.get("audio.duck_volume", 25))
         self.duck_enabled = tk.BooleanVar(value=cfg.get("audio.duck_enabled", True))
+        self.stop_for_pa = tk.BooleanVar(value=cfg.get("audio.announce_stops_music", True))
         self.family_safe = tk.BooleanVar(value=cfg.get("audio.family_safe", False))
 
         ttk.Label(tab, text="Stops and skips fade out over:").grid(row=0, column=0,
@@ -145,27 +146,30 @@ class SettingsDialog:
             text=f"{self.fade_out.get():.1f}s" if self.fade_out.get() else "instant"))
         self.fade_label.config(text=f"{self.fade_out.get():.1f}s")
 
+        ttk.Checkbutton(tab, text="Stop the music when the PA talks (off: duck it instead)",
+                        variable=self.stop_for_pa
+                        ).grid(row=1, column=0, columnspan=3, sticky=tk.W, pady=(8, 0))
         ttk.Checkbutton(tab, text="Duck the music while the PA is talking",
                         variable=self.duck_enabled
-                        ).grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=8)
-        ttk.Label(tab, text="Ducked volume:").grid(row=2, column=0, sticky=tk.W, pady=8)
+                        ).grid(row=2, column=0, columnspan=2, sticky=tk.W, pady=8)
+        ttk.Label(tab, text="Ducked volume:").grid(row=3, column=0, sticky=tk.W, pady=8)
         ttk.Scale(tab, from_=0, to=80, variable=self.duck_volume, length=220
-                  ).grid(row=2, column=1, padx=8)
+                  ).grid(row=3, column=1, padx=8)
         self.duck_label = ttk.Label(tab, text=f"{self.duck_volume.get()}%")
-        self.duck_label.grid(row=2, column=2, sticky=tk.W)
+        self.duck_label.grid(row=3, column=2, sticky=tk.W)
         self.duck_volume.trace_add("write", lambda *_: self.duck_label.config(
             text=f"{int(self.duck_volume.get())}%"))
 
-        ttk.Separator(tab, orient="horizontal").grid(row=3, column=0, columnspan=3,
+        ttk.Separator(tab, orient="horizontal").grid(row=4, column=0, columnspan=3,
                                                      sticky="ew", pady=14)
         ttk.Checkbutton(tab, text="Family-safe mode — keep flagged tracks out of rotation",
                         variable=self.family_safe
-                        ).grid(row=4, column=0, columnspan=3, sticky=tk.W)
+                        ).grid(row=5, column=0, columnspan=3, sticky=tk.W)
         ttk.Label(tab, text="Flag a track by right-clicking it in the playlist. "
                             "Flagged tracks stay in the list but are skipped when "
                             "shuffling with this on.",
                   font=("Arial", 9, "italic"), foreground="#555", wraplength=560
-                  ).grid(row=5, column=0, columnspan=3, sticky=tk.W, pady=(4, 0))
+                  ).grid(row=6, column=0, columnspan=3, sticky=tk.W, pady=(4, 0))
         return tab
 
     def _announcer_tab(self, parent):
@@ -225,6 +229,7 @@ class SettingsDialog:
         cfg.set("audio.fade_out", round(float(self.fade_out.get()), 2))
         cfg.set("audio.duck_volume", int(self.duck_volume.get()))
         cfg.set("audio.duck_enabled", bool(self.duck_enabled.get()))
+        cfg.set("audio.announce_stops_music", bool(self.stop_for_pa.get()))
         cfg.set("audio.family_safe", bool(self.family_safe.get()))
         cfg.set("announcer.use_cache", bool(self.use_cache.get()))
         cfg.set("announcer.timeout", float(self.timeout.get()))

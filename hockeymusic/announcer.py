@@ -253,9 +253,15 @@ class Announcer:
             self._unduck(ducked)
 
     def _duck(self):
-        if not (self.music and self.config.get("audio.duck_enabled", True)):
+        if not self.music or not self.music.is_playing():
             return None
-        if not self.music.is_playing():
+        if self.config.get("audio.announce_stops_music", True):
+            # A goal call over the goal song is mush. Kill the music outright;
+            # the operator cues the next track after the announcement.
+            self.music.cancel_fades()
+            self.music.stop()
+            return None
+        if not self.config.get("audio.duck_enabled", True):
             return None
         level = int(self.config.get("audio.duck_volume", 25))
         return self.music.duck(level)

@@ -19,7 +19,8 @@ class GoalDialog:
         self.scorer = tk.StringVar()
         self.assist1 = tk.StringVar()
         self.assist2 = tk.StringVar()
-        self.play_song = tk.BooleanVar(value=True)
+        self.play_song = tk.BooleanVar(
+            value=bool(app.config.get("announcer.play_song_on_announce", False)))
         # Which field the roster quick-pick buttons fill next.
         self.target = tk.StringVar(value="scorer")
 
@@ -73,7 +74,7 @@ class GoalDialog:
 
         self._build_quick_pick(frame)
 
-        ttk.Checkbutton(frame, text="Play the scorer's goal song first",
+        ttk.Checkbutton(frame, text="Also play the goal song (off: the GOAL button already did)",
                         variable=self.play_song).pack(anchor="w", pady=(8, 4))
         self.song_label = ttk.Label(frame, text="", font=("Arial", 9, "italic"),
                                     foreground="#555")
@@ -179,6 +180,8 @@ class GoalDialog:
         home = self.team.get() == "home"
         player = self.roster.get(scorer) if home else None
 
+        self.app.config.set("announcer.play_song_on_announce", bool(self.play_song.get()))
+        self.app.config.save()
         if home and self.play_song.get():
             self.app.play_goal_song(player)
 

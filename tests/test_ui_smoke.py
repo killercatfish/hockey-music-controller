@@ -74,6 +74,9 @@ class FakeMusic:
     def is_playing(self):
         return self.playing
 
+    def playing_state(self):
+        return self.playing
+
     def get_player_position(self):
         return 12.0
 
@@ -165,6 +168,17 @@ class TestMainWindow(UITestCase):
         self.assertEqual(app.position, 4)
         app.space_key()
         self.assertEqual(music.played[-1][1], app.pool.music_index(4))
+
+    def test_space_stops_when_music_state_is_unknown(self):
+        app, music = self.app, self.app.music
+        music.playing = True
+        music.playing_state = lambda: None      # Music busy / didn't answer
+        app.position = 3
+        before = len(music.played)
+        app.space_key()
+        self.assertFalse(music.playing)         # stopped, nothing new started
+        self.assertEqual(len(music.played), before)
+        self.assertEqual(app.position, 4)
 
     def test_arrows_move_the_queue_and_enter_plays_it(self):
         app = self.app

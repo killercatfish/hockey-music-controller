@@ -283,10 +283,21 @@ class AppleMusicController:
         return out if ok else None      # None = unknown, keep the last value
 
     def is_playing(self):
-        out, ok = self._poll(
-            'tell application "Music" to if player state is playing '
-            'then return "yes" else return "no"')
-        return ok and out == "yes"
+        """Non-blocking; False when Music is busy. (The old one-line
+        if/else script was an AppleScript syntax error and always said no.)"""
+        out, ok = self._poll('tell application "Music" to get player state')
+        return ok and out == "playing"
+
+    def playing_state(self):
+        """True/False, or None if Music didn't answer. Waits its turn (unlike
+        `is_playing`, which skips when the UI poll holds the lock) -- for the
+        Space key, where a wrong "not playing" starts a song instead of
+        stopping one."""
+        out, ok = self._run('tell application "Music" to get player state',
+                            max_retries=1, silent=True)
+        if not ok or not out:
+            return None
+        return out == "playing"
 
     def get_player_position(self):
         """Seconds into the current track, or None when stopped."""

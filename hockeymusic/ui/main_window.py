@@ -532,7 +532,9 @@ class HockeyMusicApp:
     def space_key(self):
         """Space at the box: playing -> stop and queue the next song;
         silent -> play the queued song. One key, whistle to whistle."""
-        if self.music.is_playing():
+        # Unknown counts as playing: at the whistle a stop that does nothing
+        # beats a Space that starts the next song over the one still going.
+        if self.music.playing_state() is not False:
             self.next_track()
         else:
             self.play_queued()

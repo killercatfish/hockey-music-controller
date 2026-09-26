@@ -169,6 +169,12 @@ before were bulk genre defaults (5/8/10/12s), not hand-tuned — that's why
 are Apple Music subscription tracks (DRM). Only ~41 have local files. Lyrics
 are the only per-song timing signal available without a virtual audio device.
 
+**Hume quota (2026-09-26):** the account hit HTTP 429 "Quota limit exceeded"
+mid pre-render. The "Everything" scope is ~300 lines; "Lineup + unassisted" is
+~35 and had already rendered. `Announcer` now backs off Hume for 10 minutes
+after a 429 (uncached lines fall straight to the macOS voice) and pre-render
+stops on the first one. Check the plan at platform.hume.ai before a big render.
+
 **The Hume SDK warns on Python 3.14** (`pydantic.v1` compatibility). It's a
 warning, not a failure; synthesis works.
 

@@ -202,5 +202,46 @@ class TestClipSharing(unittest.TestCase):
     def test_unknown_track_is_none(self):
         self.assertIsNone(self.pools.clip_for("Other | Band"))
 
+
+class TestAnnouncerQuota(unittest.TestCase):
+    """A Hume 429 must not stall a goal call or hammer the API during pre-render."""
+
+    def _announcer(self):
+        from hockeymusic import announcer as mod
+        a = mod.Announcer(Config({}))
+        return a, mod
+
+    def test_quota_error_is_recognised(self):
+        _, mod = self._announcer()
+        self.assertTrue(mod._is_quota_error(
+            "headers: {...}, status_code: 429, body: {'fault': {'faultstring': "
+            "'Rate limit quota violation. Quota limit exceeded.'}}"))
+        self.assertFalse(mod._is_quota_error("status_code: 500, body: {}"))
+
+    def test_backoff_then_retry(self):
+        import time
+        a, mod = self._announcer()
+        a.quota_exhausted_at = time.time()
+        self.assertTrue(a.quota_exhausted)
+        a.quota_exhausted_at = time.time() - mod.QUOTA_BACKOFF - 1
+        self.assertFalse(a.quota_exhausted)
+        self.assertIsNone(a.quota_exhausted_at)
+
+    def test_prerender_stops_after_quota_error(self):
+        import time
+        a, _ = self._announcer()
+        calls = []
+
+        def fake_render(text, force=False):
+            calls.append(text)
+            a.quota_exhausted_at = time.time()      # what _synthesize does on 429
+            return None
+
+        a.render = fake_render
+        items = [(f"k{i}", f"line {i}") for i in range(50)]
+        rendered, skipped, failed = a.prerender(items)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual((rendered, skipped, failed), (0, 0, 50))
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -17,8 +17,23 @@ import queue
 import socket
 import subprocess
 import threading
+import time
 
 from . import paths
+
+QUOTA_BACKOFF = 10 * 60      # seconds to skip Hume after a 429
+
+
+def _is_quota_error(message):
+    text = str(message)
+    return "429" in text and ("quota" in text.lower() or "rate limit" in text.lower())
+
+
+def _short_error(message):
+    """The SDK's error string is a wall of response headers; keep the tail."""
+    text = str(message)
+    i = text.find("status_code")
+    return text[i:i + 200] if i >= 0 else text[:200]
 
 try:
     from hume import HumeClient
@@ -49,6 +64,10 @@ class Announcer:
         self.voice_id = HUME_VOICE_ID
         self._jobs = queue.Queue()
         self._worker = None
+        # After a 429 (account quota exhausted) Hume is skipped for a while, so
+        # a goal call falls straight through to the macOS voice instead of
+        # waiting on a request that is going to fail anyway.
+        self.quota_exhausted_at = None
         paths.ensure_dirs()
 
     # -- capability -------------------------------------------------------
@@ -58,7 +77,18 @@ class Announcer:
         return bool(HUME_SDK and HUME_API_KEY and self.voice_id)
 
     @property
+    def quota_exhausted(self):
+        if self.quota_exhausted_at is None:
+            return False
+        if time.time() - self.quota_exhausted_at > QUOTA_BACKOFF:
+            self.quota_exhausted_at = None      # try again after the backoff
+            return False
+        return True
+
+    @property
     def status_text(self):
+        if self.hume_available and self.quota_exhausted:
+            return "macOS voice (Hume quota exhausted -- check your Hume plan)"
         if self.hume_available:
             return f"Hume voice: {self.voice_id}"
         if not HUME_SDK:
@@ -104,7 +134,7 @@ class Announcer:
         path = self.cache_path(text)
         if path.exists() and path.stat().st_size > 0 and not force:
             return path
-        if not self.hume_available:
+        if not self.hume_available or self.quota_exhausted:
             return None
 
         audio = self._synthesize(text)
@@ -159,7 +189,12 @@ class Announcer:
         except queue.Empty:
             return None
         if status != "ok":
-            print(f"❌ Hume error: {payload}")
+            if _is_quota_error(payload):
+                self.quota_exhausted_at = time.time()
+                print("❌ Hume quota exhausted (HTTP 429). Using the macOS voice for "
+                      f"uncached lines; will retry Hume in {QUOTA_BACKOFF // 60} min.")
+            else:
+                print(f"❌ Hume error: {_short_error(payload)}")
             return None
         return payload
 
@@ -247,6 +282,13 @@ class Announcer:
                 rendered += 1
             else:
                 failed += 1
+                if self.quota_exhausted:
+                    # Every further line would fail the same way. Count them
+                    # and stop instead of hammering the API 250 more times.
+                    failed += total - i
+                    if progress:
+                        progress(total, total, "Hume quota exhausted -- stopped")
+                    break
             if progress:
                 progress(i, total, text)
         return rendered, skipped, failed

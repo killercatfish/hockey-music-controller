@@ -272,5 +272,45 @@ class TestAnnouncerStopsMusic(unittest.TestCase):
         a = Announcer(Config({}), m)
         self.assertIsNone(a._duck()); self.assertEqual(m.calls, [])
 
+
+class TestStitch(unittest.TestCase):
+    """Announcement + celebration become one file with the dead air trimmed."""
+
+    def _wav(self, path, seconds, silent_tail=0.0, rate=44100):
+        import math, array, wave
+        n = int(seconds * rate); tail = int(silent_tail * rate)
+        a = array.array("h", (int(12000 * math.sin(i / 20.0)) for i in range(n - tail)))
+        a.extend([0] * tail)
+        with wave.open(str(path), "wb") as w:
+            w.setnchannels(1); w.setsampwidth(2); w.setframerate(rate); w.writeframes(a.tobytes())
+        return path
+
+    def test_tail_is_trimmed_and_clip_appended(self):
+        import wave
+        from hockeymusic import announcer as mod
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            ann = self._wav(d / "ann.wav", 3.0, silent_tail=1.0)
+            woo = self._wav(d / "woo.wav", 1.2)
+            out = mod.stitch(ann, woo, d / "combo.wav")
+            self.assertIsNotNone(out)
+            with wave.open(str(out)) as w:
+                dur = w.getnframes() / w.getframerate()
+            # 2.0s of voice + 0.15s gap + 1.2s clip, within a few ms
+            self.assertAlmostEqual(dur, 2.0 + mod.GAP_AFTER_CALL + 1.2, delta=0.02)
+
+    def test_combined_is_cached_and_survives_missing_clip(self):
+        from hockeymusic import announcer as mod
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            mod.COMBO_DIR = d / "combo"
+            a = mod.Announcer(Config({}))
+            ann = self._wav(d / "ann.wav", 1.0, silent_tail=0.5)
+            woo = self._wav(d / "woo.wav", 0.5)
+            first = a.combined(ann, woo)
+            self.assertIsNotNone(first)
+            self.assertEqual(a.combined(ann, woo), first)      # cache hit
+            self.assertIsNone(a.combined(ann, d / "nope.m4a"))
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

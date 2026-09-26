@@ -10,6 +10,7 @@ Three problems with the original implementation, all fixed here:
 3. The music kept blasting over the announcement. Now it ducks and comes back.
 """
 
+import array
 import base64
 import hashlib
 import os
@@ -18,10 +19,68 @@ import socket
 import subprocess
 import threading
 import time
+import wave
+from pathlib import Path
 
 from . import paths
 
 QUOTA_BACKOFF = 10 * 60      # seconds to skip Hume after a 429
+
+# Stitching: announcement + celebration clip become one file so the "WOO"
+# lands right on the end of the call instead of a second afplay later.
+COMBO_DIR = paths.TTS_CACHE_DIR / "combo"
+GAP_AFTER_CALL = 0.15        # seconds between the last word and the clip
+SILENCE = 0.02               # amplitude below this counts as silence (0..1)
+_PCM = "LEI16@44100"
+
+
+def _decode_pcm(src, dst):
+    """Any audio afplay can read -> 16-bit 44.1k stereo WAV. Returns True on success."""
+    r = subprocess.run(["afconvert", "-f", "WAVE", "-d", _PCM, "-c", "2",
+                        str(src), str(dst)], capture_output=True)
+    return r.returncode == 0 and os.path.exists(dst)
+
+
+def _trim_tail(samples, channels, rate, keep=GAP_AFTER_CALL):
+    """Drop trailing silence from an int16 array, keeping `keep` seconds of it."""
+    limit = int(SILENCE * 32767)
+    last = len(samples) - 1
+    while last >= 0 and abs(samples[last]) < limit:
+        last -= 1
+    end = min(len(samples), last + 1 + int(keep * rate) * channels)
+    end -= end % channels
+    return samples[:end]
+
+
+def stitch(announcement, celebration, out_path):
+    """Write announcement(trimmed) + celebration as one WAV. Returns out_path or None."""
+    tmp_a = out_path.with_suffix(".a.wav")
+    tmp_b = out_path.with_suffix(".b.wav")
+    try:
+        if not (_decode_pcm(announcement, tmp_a) and _decode_pcm(celebration, tmp_b)):
+            return None
+        with wave.open(str(tmp_a)) as wa, wave.open(str(tmp_b)) as wb:
+            if (wa.getframerate(), wa.getnchannels(), wa.getsampwidth()) != \
+               (wb.getframerate(), wb.getnchannels(), wb.getsampwidth()):
+                return None
+            rate, ch = wa.getframerate(), wa.getnchannels()
+            a = array.array("h"); a.frombytes(wa.readframes(wa.getnframes()))
+            b = wb.readframes(wb.getnframes())
+        a = _trim_tail(a, ch, rate)
+        tmp_out = out_path.with_suffix(".part")
+        with wave.open(str(tmp_out), "wb") as w:
+            w.setnchannels(ch); w.setsampwidth(2); w.setframerate(rate)
+            w.writeframes(a.tobytes()); w.writeframes(b)
+        tmp_out.replace(out_path)
+        return out_path
+    except (OSError, wave.Error, EOFError):
+        return None
+    finally:
+        for t in (tmp_a, tmp_b):
+            try:
+                t.unlink()
+            except OSError:
+                pass
 
 
 def _is_quota_error(message):
@@ -239,8 +298,11 @@ class Announcer:
         ducked = self._duck()
         try:
             if audio:
-                subprocess.run(["afplay", str(audio)], check=False)
+                combo = self.combined(audio, celebration) if celebration else None
+                subprocess.run(["afplay", str(combo or audio)], check=False)
                 status(f"📢 {text}")
+                if combo:
+                    celebration = None          # already played, gap-free
             else:
                 # Hume unavailable -- the show still goes on.
                 voice = self.config.get("announcer.fallback_voice", "Alex")
@@ -251,6 +313,28 @@ class Announcer:
                 subprocess.run(["afplay", str(celebration)], check=False)
         finally:
             self._unduck(ducked)
+
+    def combined(self, audio, celebration):
+        """Announcement + celebration as one cached file, or None if stitching fails.
+
+        Hume leaves 0.5-1.2s of silence after the last word, and a second
+        afplay costs most of another second to start. One file, trimmed, puts
+        the WOO right on the end of the call. Keyed on both files' identity
+        and mtime, so a re-rendered take or a swapped clip re-stitches.
+        """
+        try:
+            audio, celebration = Path(audio), Path(celebration)
+            if not (audio.exists() and celebration.exists()):
+                return None
+            key = f"{audio.name}|{audio.stat().st_mtime_ns}|" \
+                  f"{celebration.resolve()}|{celebration.stat().st_mtime_ns}"
+            out = COMBO_DIR / (hashlib.sha256(key.encode()).hexdigest()[:20] + ".wav")
+            if out.exists() and out.stat().st_size > 0:
+                return out
+            COMBO_DIR.mkdir(parents=True, exist_ok=True)
+            return stitch(audio, celebration, out)
+        except OSError:
+            return None
 
     def _duck(self):
         if not self.music or not self.music.is_playing():

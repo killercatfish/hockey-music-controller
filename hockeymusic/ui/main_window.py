@@ -44,6 +44,7 @@ class HockeyMusicApp:
         self.search_var = tk.StringVar()
         self.pool_var = tk.StringVar(value=self.pools.active_name)
         self.volume_var = tk.IntVar(value=100)
+        self._stop_token = 0
 
         self._build()
         self._bind_shortcuts()
@@ -509,6 +510,7 @@ class HockeyMusicApp:
         track = self.pool.track_at(pos)
         clip = self.pools.clip_for(track, self.pool)
 
+        self._stop_token += 1           # cancel any pending fade backstop
         self.music.cancel_fades()
         self.music.set_volume(self.music.base_volume)
         self.music.play_track_from_playlist(
@@ -594,6 +596,21 @@ class HockeyMusicApp:
             self.music.set_volume(base)
 
         self.music.fade(0, duration, then=finish)
+        # Backstop on the main loop: if the fade thread never delivers the
+        # stop (seen once at the rink, cause unknown), stop anyway just after
+        # the fade should have ended. A newer play cancels it via the token.
+        self._stop_token += 1
+        token = self._stop_token
+        self.root.after(int(duration * 1000) + 400,
+                        lambda: self._backstop_stop(token, action, base))
+
+    def _backstop_stop(self, token, action, base):
+        if token != self._stop_token:
+            return                      # something newer started since
+        if self.music.playing_state() is not False:
+            print("⚠️  Fade didn't stop the music; hard-stopping")
+            action()
+            self.music.set_volume(base)
 
     def next_track(self):
         """Fade out and line up the next track for the next stoppage."""
@@ -630,6 +647,7 @@ class HockeyMusicApp:
                                    f"Set a song for “{label}” in Settings.")
             return
         self.active_clip = None
+        self._stop_token += 1           # cancel any pending fade backstop
         self.music.cancel_fades()
         self.music.set_volume(self.music.base_volume)
         if self.music.play_song_or_playlist(song):
@@ -648,6 +666,7 @@ class HockeyMusicApp:
         start = player.goal_song_start if player and player.goal_song else 0
 
         self.active_clip = None
+        self._stop_token += 1           # cancel any pending fade backstop
         self.music.cancel_fades()
         self.music.set_volume(self.music.base_volume)
         if self.music.play_track_by_name(song, start_time=start or None):

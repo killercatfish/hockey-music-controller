@@ -329,7 +329,10 @@ class AppleMusicController:
         """The volume to return to after a fade or duck (defaults to current)."""
         with self._vol_lock:
             if self._base_volume is None:
-                self._base_volume = self.get_volume() or 100
+                current = self.get_volume()
+                # 0 is a real volume, not "unknown" -- `or 100` blasted a
+                # muted box to full volume the first time it played.
+                self._base_volume = 100 if current is None else current
             return self._base_volume
 
     def remember_base_volume(self):

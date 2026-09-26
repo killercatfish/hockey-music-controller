@@ -120,10 +120,12 @@ The app gets launched from Finder and from a `.app` bundle, where CWD is not the
 project directory.
 
 **7. Secrets never enter the repo.**
-`.env` was committed to a public GitHub repo and the keys had to be rotated
-(fixed 2026-08-01 by purging history with `git filter-repo`). `.gitignore` does
-not untrack an already-committed file. `create_native_app.sh` deliberately does
-not bundle `.env`.
+`.env` was committed to the public GitHub repo. Local history was purged with
+`git filter-repo` on 2026-08-01 but the purge was NOT pushed until 2026-09-26;
+the live Hume key and Spotify secret sat public until then. **Key rotation is
+still owed** (Hume + Spotify) as of 2026-09-26 -- the audio cache is keyed on
+voice + text, so rotating costs no re-render. `.gitignore` does not untrack an
+already-committed file. `create_native_app.sh` deliberately does not bundle `.env`.
 
 ---
 

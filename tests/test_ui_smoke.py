@@ -30,6 +30,9 @@ class FakeMusic:
     def get_playlist_tracks(self, _name):
         return list(self.tracks)
 
+    def get_playlist_track_meta(self, _name):
+        return [{"track": t, "duration": 200.0 + i} for i, t in enumerate(self.tracks)]
+
     def play_track_from_playlist(self, name, index, start_time=None):
         self.played.append((name, index, start_time))
         self.playing = True
@@ -137,6 +140,10 @@ class TestMainWindow(UITestCase):
     def test_playlist_renders(self):
         self.pump()
         self.assertEqual(self.app.listbox.size(), 24)
+
+    def test_rows_show_track_length(self):
+        self.pump()
+        self.assertIn("(3:20)", self.app.listbox.get(0))
 
     def test_playlist_picker_shows_pool_playlists_then_expands(self):
         app = self.app

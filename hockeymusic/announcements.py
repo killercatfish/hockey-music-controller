@@ -41,6 +41,13 @@ def goal(team, scorer, assists=(), roster=None, team_name="Patriots"):
     return f"{text}, unassisted."
 
 
+def visiting_goal(visiting_team, scorer, assists=(), roster=None):
+    """A visiting goal when we DO have their roster (photo of the game sheet).
+    Same flat tone as the nameless version, but with the name."""
+    text = f"{visiting_team} goal, scored by {_who(scorer, roster)}."
+    return text + _assist_phrase(assists, roster, excited=False)
+
+
 def final_score(home_score, visiting_team, visiting_score, team_name="Patriots"):
     return (f"Final score: {team_name} {home_score}, "
             f"{visiting_team} {visiting_score}")

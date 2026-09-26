@@ -380,6 +380,9 @@ class HockeyMusicApp:
             marks.append(f"⏱{window}")
         if track in self.pool.flagged:
             marks.append("🚫")
+        length = self.pool.durations.get(track)
+        if length:
+            marks.append(f"({format_seconds(int(length))})")
         prefix = f"{pos + 1:>3}. "
         suffix = ("  " + " ".join(marks)) if marks else ""
         return f"{prefix}{track}{suffix}"

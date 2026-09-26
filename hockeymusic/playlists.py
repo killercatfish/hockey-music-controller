@@ -61,16 +61,29 @@ class Pool:
         self.tracks = list(tracks or [])
         self.clips = dict(clips or {})            # track string -> Clip
         self.flagged = set(flagged or ())         # tracks kept out of rotation
+        self.durations = {}                       # track string -> seconds (not saved)
         self.order = list(range(len(self.tracks)))
         self.history = deque(maxlen=self.HISTORY_LEN)
 
     # -- tracks -----------------------------------------------------------
 
     def load_tracks(self, controller):
-        """Pull the track list from Apple Music. Returns the count."""
-        tracks = controller.get_playlist_tracks(self.playlist)
+        """Pull the track list from Apple Music. Returns the count.
+
+        Uses the bulk meta read when the controller has one, so the list can
+        show each track's length; the plain name read is the fallback.
+        """
+        tracks, durations = [], {}
+        meta = getattr(controller, "get_playlist_track_meta", None)
+        if meta:
+            rows = meta(self.playlist)
+            tracks = [r["track"] for r in rows]
+            durations = {r["track"]: r["duration"] for r in rows if r.get("duration")}
+        if not tracks:
+            tracks = controller.get_playlist_tracks(self.playlist)
         if tracks:
             self.tracks = tracks
+            self.durations = durations
             self.reset_order()
         return len(tracks)
 

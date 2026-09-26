@@ -25,6 +25,9 @@ def demo_roster():
 class TestAnnouncements(unittest.TestCase):
     def setUp(self):
         self.roster = demo_roster()
+        self.roster_away = Roster()
+        self.roster_away.players["71"] = Player("71", "Declan Manley")
+        self.roster_away.players["22"] = Player("22", "Cedar Keaton")
 
     def test_scorer_and_assists_use_names(self):
         # The old build read assists out as bare numbers.
@@ -49,6 +52,13 @@ class TestAnnouncements(unittest.TestCase):
         self.assertTrue(text.startswith("Goal scored by number 12"))
         self.assertNotIn("!", text)
 
+
+    def test_visiting_goal_uses_their_roster(self):
+        text = announcements.visiting_goal("Catamounts", "71", ["22"], self.roster_away)
+        self.assertEqual(text, "Catamounts goal, scored by number 71, Declan Manley."
+                               " Assisted by number 22, Cedar Keaton.")
+        text = announcements.visiting_goal("Catamounts", "99", [], self.roster_away)
+        self.assertEqual(text, "Catamounts goal, scored by number 99. Unassisted.")
     def test_team_name_is_configurable(self):
         text = announcements.goal("home", "7", [], self.roster, team_name="Bruins")
         self.assertTrue(text.startswith("Bruins GOAL!!"))

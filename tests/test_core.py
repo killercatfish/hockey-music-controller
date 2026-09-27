@@ -351,3 +351,30 @@ class TestNoRobotVoice(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class TestHumeEnvFile(unittest.TestCase):
+    """Settings writes Hume credentials to ~/.hockey_music/.env, merging."""
+
+    def setUp(self):
+        from hockeymusic import paths
+        self.tmp = tempfile.TemporaryDirectory()
+        self._saved = paths.DATA_DIR
+        paths.DATA_DIR = Path(self.tmp.name) / "data"
+
+    def tearDown(self):
+        from hockeymusic import paths
+        paths.DATA_DIR = self._saved
+        self.tmp.cleanup()
+
+    def test_round_trip_and_merge(self):
+        from hockeymusic.ui.dialogs import _read_env_file, _write_env_file, _env_path
+        self.assertEqual(_read_env_file(), {})
+        self.assertTrue(_write_env_file({"HUME_API_KEY": "abc", "HUME_VOICE_ID": "Rink Voice"}))
+        self.assertEqual(_read_env_file(), {"HUME_API_KEY": "abc", "HUME_VOICE_ID": "Rink Voice"})
+        # Another line survives, a blank value removes a key, no-op returns False.
+        with open(_env_path(), "a") as f:
+            f.write("SPOTIFY_SECRET='keep me'\n")
+        self.assertFalse(_write_env_file({"HUME_API_KEY": "abc", "HUME_VOICE_ID": "Rink Voice"}))
+        self.assertTrue(_write_env_file({"HUME_API_KEY": "abc", "HUME_VOICE_ID": ""}))
+        self.assertEqual(_read_env_file(), {"HUME_API_KEY": "abc", "SPOTIFY_SECRET": "keep me"})

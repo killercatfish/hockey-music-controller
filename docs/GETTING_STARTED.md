@@ -33,5 +33,27 @@ that travels with the code.
    **G** goal song, **A** announce a goal, **S** hard stop, **O/P** power play
    and penalty kill, **L** starting lineup.
 
+## Optional: the real announcer voice (Hume AI)
+
+Out of the box, goal calls use a built-in Mac voice. The arena-announcer voice
+comes from Hume AI, a paid text-to-speech service (a few dollars a month covers
+a season). Setup is all clicking:
+
+1. Sign up at [platform.hume.ai](https://platform.hume.ai). Pick a plan.
+2. In Hume, open **Text to Speech**, describe the voice you want (for example
+   "energetic arena hockey PA announcer") and **save it** with a name like
+   `Rink Announcer`. That name is what the app asks for.
+3. In Hume, open **API keys** and copy your key.
+4. In the app: **⚙️ Settings → Announcer**, paste the key and type the voice
+   name into the *Hume AI* fields. **Save**, then quit and relaunch. The
+   Announcer tab turns green when Hume is connected.
+5. Click **🎤 Pre-render voice** at the bottom of the window and render the
+   lineup and goal calls at home, on wifi. They are saved to disk and play
+   instantly at the rink with no internet.
+
+While you're setting it up, leave the *say it in a macOS voice* box checked so
+nothing goes silent. Once Hume works, untick it if you'd rather skip a call
+than hear the robot voice.
+
 Settings, roster and clip points are stored in your home folder, so updating
 is just downloading the ZIP again and swapping the folder.

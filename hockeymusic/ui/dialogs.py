@@ -4,7 +4,7 @@ import threading
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-from .. import announcements
+from .. import announcements, paths
 from ..config import EVENT_KEYS
 from ..playlists import format_seconds, parse_time
 from .common import modal, center, preview_box
@@ -200,6 +200,27 @@ class SettingsDialog:
         ttk.Entry(tab, textvariable=self.default_clip, width=24
                   ).grid(row=3, column=1, sticky=tk.W, padx=8)
 
+        # Hume credentials live in ~/.hockey_music/.env, never in the config
+        # or the repo. These fields write that file so nobody needs a terminal.
+        current = _read_env_file()
+        self.hume_key = tk.StringVar(value=current.get("HUME_API_KEY", ""))
+        self.hume_voice = tk.StringVar(value=current.get("HUME_VOICE_ID", ""))
+        ttk.Separator(tab, orient="horizontal").grid(row=8, column=0, columnspan=2,
+                                                     sticky="ew", pady=14)
+        ttk.Label(tab, text="Hume AI (optional -- the custom announcer voice)",
+                  font=("Arial", 11, "bold")).grid(row=9, column=0, columnspan=2,
+                                                   sticky=tk.W)
+        ttk.Label(tab, text="API key:").grid(row=10, column=0, sticky=tk.W, pady=6)
+        ttk.Entry(tab, textvariable=self.hume_key, width=44, show="•"
+                  ).grid(row=10, column=1, sticky=tk.W, padx=8)
+        ttk.Label(tab, text="Voice name (as saved in Hume):").grid(row=11, column=0,
+                                                                   sticky=tk.W, pady=6)
+        ttk.Entry(tab, textvariable=self.hume_voice, width=30
+                  ).grid(row=11, column=1, sticky=tk.W, padx=8)
+        ttk.Label(tab, text="Saved to ~/.hockey_music/.env. Relaunch the app after "
+                            "changing these.", foreground="#666"
+                  ).grid(row=12, column=0, columnspan=2, sticky=tk.W)
+
         self.fallback_enabled = tk.BooleanVar(
             value=cfg.get("announcer.fallback_enabled", False))
         ttk.Checkbutton(tab, text="If Hume can't render a line, say it in a macOS voice "
@@ -244,6 +265,8 @@ class SettingsDialog:
         cfg.set("announcer.fallback_voice", self.fallback_voice.get())
         cfg.set("announcer.fallback_enabled", bool(self.fallback_enabled.get()))
         cfg.save()
+        _write_env_file({"HUME_API_KEY": self.hume_key.get().strip(),
+                         "HUME_VOICE_ID": self.hume_voice.get().strip()})
         self.app.apply_settings()
         self.win.destroy()
 
@@ -438,3 +461,40 @@ class ClipDialog:
         self.app.save_pools()
         self.app.refresh_playlist_view()
         self.win.destroy()
+
+
+def _env_path():
+    return paths.DATA_DIR / ".env"
+
+
+def _read_env_file():
+    """KEY=value lines from ~/.hockey_music/.env (quotes stripped)."""
+    values = {}
+    try:
+        for line in _env_path().read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            values[key.strip()] = val.strip().strip("\'\"")
+    except OSError:
+        pass
+    return values
+
+
+def _write_env_file(updates):
+    """Merge `updates` into ~/.hockey_music/.env, keeping other lines. A blank
+    value removes the key. Only writes when something actually changes."""
+    current = _read_env_file()
+    merged = {**current, **{k: v for k, v in updates.items()}}
+    merged = {k: v for k, v in merged.items() if v}
+    if merged == current:
+        return False
+    paths.ensure_dirs()
+    path = _env_path()
+    path.write_text("".join(f"{k}={v}\n" for k, v in merged.items()))
+    try:
+        path.chmod(0o600)
+    except OSError:
+        pass
+    return True

@@ -18,6 +18,14 @@ if ! python3 -c "import tkinter" 2>/dev/null; then
     exit 1
 fi
 
+# The custom announcer voice needs two small Python packages. Install them the
+# first time only (needs internet); the app runs fine without them.
+if ! python3 -c "import hume, dotenv" >/dev/null 2>&1; then
+    echo "First run: installing the announcer voice packages (one time, ~1 minute)..."
+    python3 -m pip install --user --quiet --disable-pip-version-check hume python-dotenv \
+        || echo "Couldn't install them (no internet?). The app still works; announcements use the Mac voice."
+fi
+
 open -a Music
 sleep 2
 echo "Starting Hockey Music Controller... (leave this window open while the app runs)"

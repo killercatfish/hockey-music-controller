@@ -17,8 +17,14 @@ the goal calls sound like a real arena announcer rather than a robot.
 
 ## 2. Store the key
 
-Preferred — outside the repo, so it can never be committed and so a `.app`
-bundle you hand to another parent doesn't carry your key:
+**No terminal needed:** open the app, click **⚙️ Settings → Announcer**, paste
+the API key and type the voice name into the *Hume AI* fields, click **Save**,
+and relaunch. That writes `~/.hockey_music/.env` for you. The launcher
+(`Start Hockey Music.command`) installs the `hume` and `python-dotenv`
+packages on first run, so nothing below is required unless you prefer it.
+
+Manual alternative — outside the repo, so it can never be committed and so a
+`.app` bundle you hand to another parent doesn't carry your key:
 
 ```bash
 mkdir -p ~/.hockey_music

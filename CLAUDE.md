@@ -24,9 +24,9 @@ tkinter, Apple Music must be running. Currently developed on Python 3.14.
 bash launch.sh                    # checks deps, opens Music, launches
 python3 hockey_music_controller.py
 
-python3 tests/test_core.py        # 24 tests: copy, roster, playlists, migration, clip sharing
-python3 tests/test_ui_smoke.py    # 16 tests: builds every window
-python3 tests/test_hype.py        # 18 tests: chorus detection, proposal apply, game-deck split
+python3 tests/test_core.py        # 39 tests: copy, roster, playlists, migration, clip sharing
+python3 tests/test_ui_smoke.py    # 24 tests: builds every window
+python3 tests/test_hype.py        # 20 tests: chorus detection, proposal apply, game-deck split
 
 python3 hype_points.py propose|show|apply|revert   # clip starts at the chorus (docs/HYPE_POINTS.md)
 python3 game_playlists.py --games 2 [--dry-run]    # one playlist per game (docs/GAME_PLAYLISTS.md)
@@ -95,6 +95,9 @@ rejects `set player position` (error -10006) until the track loads. v3.0 slept
 0.4s and hoped; on a miss the retry re-issued `play`, so the song audibly
 restarted from 0:00 before jumping. `_seek_verified` retries only the seek and
 reads the position back. Keep `play` and the seek as separate calls.
+A downloaded track starts instantly, so `_play_then_seek` holds Music's volume
+at 0 from `play` until the seek lands (else the first ~0.3s of the intro is
+heard, then a jump), and sets `_fading` so a duck in that window can't snapshot 0.
 
 **3. Bulk-read track properties, never loop in AppleScript.**
 `get_playlist_tracks` reads the name and artist columns in one call: ~0.2s on a

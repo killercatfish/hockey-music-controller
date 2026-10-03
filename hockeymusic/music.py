@@ -204,19 +204,39 @@ class AppleMusicController:
 
     def play_track_from_playlist(self, playlist_name, track_index, start_time=None):
         """Play track `track_index` (1-indexed) of a playlist, optionally seeking."""
-        ok = self._run(f'tell application "Music" to play track {int(track_index)} '
-                       f'of playlist "{_escape(playlist_name)}"')[1]
+        ok = self._play_then_seek(f'tell application "Music" to play track {int(track_index)} '
+                                  f'of playlist "{_escape(playlist_name)}"', start_time)
         if not ok:
             print(f"❌ Could not play track {track_index} of '{playlist_name}'")
-        elif start_time:
-            self._seek_verified(start_time)
         return ok
 
     def play_track_by_name(self, track_name, start_time=None):
-        ok = self._run(f'tell application "Music" to play track "{_escape(track_name)}"')[1]
-        if ok and start_time:
-            self._seek_verified(start_time)
-        return ok
+        return self._play_then_seek(
+            f'tell application "Music" to play track "{_escape(track_name)}"', start_time)
+
+    def _play_then_seek(self, play_script, start_time):
+        """Run `play_script`, then seek -- muted until the seek lands.
+
+        A downloaded track starts instantly, so the ~0.3s before Music accepts
+        the seek was audible as the song's first moment, then a jump. Holding
+        the volume at 0 through the seek hides it. `_fading` stops a duck in
+        that window from snapshotting 0 as the operator's volume.
+        """
+        if not start_time:
+            return self._run(play_script)[1]
+        restore = self.base_volume
+        with self._vol_lock:
+            self._fading = True
+        self.set_volume(0)
+        try:
+            ok = self._run(play_script)[1]
+            if ok:
+                self._seek_verified(start_time)
+            return ok
+        finally:
+            self.set_volume(restore)
+            with self._vol_lock:
+                self._fading = False
 
     def play_playlist(self, playlist_name):
         """Play a whole user playlist from its first track (Zamboni set etc)."""
@@ -231,7 +251,7 @@ class AppleMusicController:
             return self.play_playlist(name)
         return self.play_track_by_name(name)
 
-    def _seek_verified(self, seconds, attempts=8, settle=0.25):
+    def _seek_verified(self, seconds, attempts=20, settle=0.05):
         """Seek to `seconds` once the player is ready, and confirm it took.
 
         Right after `play`, Music refuses `set player position` (error -10006)

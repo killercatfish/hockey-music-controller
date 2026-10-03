@@ -349,8 +349,52 @@ class TestNoRobotVoice(unittest.TestCase):
         calls, _ = self._run(True)
         self.assertEqual(calls, ["say"])
 
-if __name__ == "__main__":
-    unittest.main(verbosity=2)
+
+class TestPlayMutedSeek(unittest.TestCase):
+    """A clip start plays muted until the seek lands, then restores the volume."""
+
+    def _controller(self, seek_failures=1):
+        from hockeymusic import music as mod
+        log, state = [], {"fails": seek_failures}
+
+        def fake(script, **_kw):
+            s = script.split(" to ", 1)[-1].strip()
+            log.append(s)
+            if s == "get sound volume":
+                return "70", True
+            if s.startswith("set player position"):
+                if state["fails"]:
+                    state["fails"] -= 1
+                    return "", False          # -10006: track still loading
+                return "", True
+            if s == "get player position":
+                return "25.0", True
+            return "", True
+
+        self._saved = mod.run_applescript
+        mod.run_applescript = fake
+        self.addCleanup(setattr, mod, "run_applescript", self._saved)
+        return mod.AppleMusicController(), log
+
+    def test_mute_play_seek_restore_order(self):
+        m, log = self._controller()
+        self.assertTrue(m.play_track_from_playlist("Deck", 3, start_time=25))
+        self.assertEqual(log[1], "set sound volume to 0")
+        self.assertTrue(log[2].startswith("play track 3"))
+        self.assertEqual(log.count("play track 3 of playlist \"Deck\""), 1)  # play never re-issued
+        self.assertEqual(log[-1], "set sound volume to 70")
+        self.assertFalse(m._fading)
+
+    def test_no_start_plays_without_touching_volume(self):
+        m, log = self._controller()
+        m.play_track_by_name("Song", start_time=None)
+        self.assertEqual(log, ['play track "Song"'])
+
+    def test_duck_during_mute_keeps_operator_volume(self):
+        m, _ = self._controller()
+        m._base_volume = 70
+        m._fading = True                     # as during the muted seek
+        self.assertEqual(m.remember_base_volume(), 70)
 
 
 class TestHumeEnvFile(unittest.TestCase):
@@ -378,3 +422,7 @@ class TestHumeEnvFile(unittest.TestCase):
         self.assertFalse(_write_env_file({"HUME_API_KEY": "abc", "HUME_VOICE_ID": "Rink Voice"}))
         self.assertTrue(_write_env_file({"HUME_API_KEY": "abc", "HUME_VOICE_ID": ""}))
         self.assertEqual(_read_env_file(), {"HUME_API_KEY": "abc", "SPOTIFY_SECRET": "keep me"})
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

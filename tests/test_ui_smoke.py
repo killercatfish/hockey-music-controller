@@ -139,7 +139,12 @@ class UITestCase(unittest.TestCase):
             tk.Toplevel(self.root), music=FakeMusic(), autostart=False)
         # Never let a test hit the network or play audio.
         self.announced = []
-        self.app.announce = lambda text, celebration=None: self.announced.append(text)
+        self.announced_pieces = []
+
+        def fake_announce(text, celebration=None, pieces=None):
+            self.announced.append(text)
+            self.announced_pieces.append(pieces)
+        self.app.announce = fake_announce
         self.app.pool.playlist = "Stoppage Music"
         self.app.load_pool_tracks(quiet=True)
 
@@ -368,6 +373,28 @@ class TestDialogs(UITestCase):
         self.assertIn("Alexander Mellen", shown)
         self.assertIn("Cale Kulig", shown)
         dialog.win.destroy()
+
+    def test_away_goal_from_cached_pieces(self):
+        from hockeymusic import announcements
+        from hockeymusic.ui.goal_dialog import GoalDialog
+
+        dialog = GoalDialog(self.app)
+        dialog.team.set("away")
+        dialog.scorer.set("12")
+        dialog.assist1.set("7")
+        self.pump()
+        self.assertNotIn("Assembled", dialog.cache_label.cget("text"))
+
+        pieces = announcements.away_goal_pieces("12", ["7"])
+        paths.TTS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        for piece in pieces:
+            self.app.announcer.cache_path(piece).write_bytes(b"x")
+        dialog._refresh()
+        self.assertIn("Assembled from pieces", dialog.cache_label.cget("text"))
+
+        dialog.announce()
+        self.assertEqual(self.announced, [announcements.goal("away", "12", ["7", ""])])
+        self.assertEqual(self.announced_pieces, [pieces])
 
     def test_goal_dialog_quick_pick_advances_fields(self):
         from hockeymusic.roster import Player

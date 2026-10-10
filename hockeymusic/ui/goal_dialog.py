@@ -143,6 +143,8 @@ class GoalDialog:
             ann = self.app.announcer
             if ann.is_cached(text):
                 msg, colour = "⚡ Cached — plays instantly, no wifi needed", "#0a6"
+            elif ann.pieces_cached(self._pieces()):
+                msg, colour = "🧩 Assembled from pieces — plays offline", "#0a6"
             elif ann.can_render:
                 msg, colour = "☁️ Not cached — will render from Hume (needs wifi)", "#c60"
             elif self.app.config.get("announcer.fallback_enabled", False):
@@ -174,6 +176,14 @@ class GoalDialog:
             self.app.config.team_name,
         )
 
+    def _pieces(self):
+        """Away goals only: the cached pieces that can stand in for the full line."""
+        scorer = self.scorer.get().strip()
+        if self.team.get() != "away" or not scorer:
+            return None
+        return announcements.away_goal_pieces(
+            scorer, [self.assist1.get().strip(), self.assist2.get().strip()])
+
     # -- action -----------------------------------------------------------
 
     def announce(self):
@@ -198,7 +208,7 @@ class GoalDialog:
             found = paths.sound_clip(clip)
             celebration = str(found) if found else None
 
-        self.app.announce(self._text(), celebration=celebration)
+        self.app.announce(self._text(), celebration=celebration, pieces=self._pieces())
         self.win.destroy()
 
 

@@ -53,6 +53,31 @@ class TestAnnouncements(unittest.TestCase):
         self.assertNotIn("!", text)
 
 
+    def test_away_pieces_say_the_same_words_as_the_full_call(self):
+        # Invariant 1: pieces may only move commas, never change what's said.
+        import re
+        words = lambda t: re.sub(r"[,.]", "", t).split()
+        for scorer, assists in (("12", []), ("12", ["4"]), ("00", ["7", "99"]),
+                                ("#3", ["", "8"])):
+            pieces = announcements.away_goal_pieces(scorer, assists)
+            self.assertEqual(words(" ".join(pieces)),
+                             words(announcements.goal("away", scorer, assists)))
+
+    def test_away_pieces_are_all_in_the_manifest(self):
+        manifest = announcements.away_piece_manifest()
+        texts = {t for _, t in manifest}
+        self.assertEqual(len(texts), len(manifest))
+        self.assertEqual(len(manifest), 4 + 2 * 101)
+        self.assertEqual(announcements.prerender_manifest(None, scope="away"), manifest)
+        for scorer in ("0", "00", "55", "99"):
+            for assists in ([], ["1"], ["10", "00"]):
+                self.assertLessEqual(
+                    set(announcements.away_goal_pieces(scorer, assists)), texts)
+
+    def test_away_pieces_refuse_odd_numbers(self):
+        self.assertIsNone(announcements.away_goal_pieces("100"))
+        self.assertIsNone(announcements.away_goal_pieces("7", ["A"]))
+
     def test_visiting_goal_uses_their_roster(self):
         text = announcements.visiting_goal("Catamounts", "71", ["22"], self.roster_away)
         self.assertEqual(text, "Catamounts goal, scored by number 71, Declan Manley."
@@ -321,6 +346,58 @@ class TestStitch(unittest.TestCase):
             self.assertIsNotNone(first)
             self.assertEqual(a.combined(ann, woo), first)      # cache hit
             self.assertIsNone(a.combined(ann, d / "nope.m4a"))
+
+
+    def test_join_trims_both_ends_and_inserts_pauses(self):
+        import wave
+        from hockeymusic import announcer as mod
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            parts = []
+            for i, pause in enumerate((0.18, 0.05, 0.15)):
+                wav = d / f"p{i}.wav"
+                self._wav(wav, 1.0, silent_tail=0.5)        # 0.5s voice, 0.5s dead air
+                self._prepend_silence(wav, 0.6)
+                parts.append((wav, pause))
+            out = mod.join(parts, d / "joined.wav")
+            self.assertIsNotNone(out)
+            with wave.open(str(out)) as w:
+                dur = w.getnframes() / w.getframerate()
+            expected = 3 * (0.5 + 2 * mod.EDGE) + 0.18 + 0.05 + 0.15
+            self.assertAlmostEqual(dur, expected, delta=0.03)
+
+    def _prepend_silence(self, path, seconds):
+        import wave
+        with wave.open(str(path)) as w:
+            params, frames = w.getparams(), w.readframes(w.getnframes())
+        with wave.open(str(path), "wb") as w:
+            w.setparams(params)
+            w.writeframes(b"\0\0" * int(seconds * params.framerate) + frames)
+
+    def test_away_call_plays_from_pieces_without_hume(self):
+        from hockeymusic import announcer as mod
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            mod.COMBO_DIR = d / "combo"
+            a = mod.Announcer(Config({}))
+            pieces = announcements.away_goal_pieces("12", ["7"])
+            files = {p: self._wav(d / f"{i}.wav", 0.6, silent_tail=0.2)
+                     for i, p in enumerate(pieces)}
+            a.cache_path = lambda text: files.get(text, d / "missing.wav")
+            a.render = lambda text, force=False: self.fail("should not call Hume")
+            played = []
+            real_run = mod.subprocess.run
+            mod.subprocess.run = lambda cmd, **kw: (
+                real_run(cmd, **kw) if cmd[0] == "afconvert" else played.append(cmd))
+            try:
+                a._play_one(announcements.goal("away", "12", ["7"]), None, None, pieces)
+            finally:
+                mod.subprocess.run = real_run
+            self.assertEqual(len(played), 1)
+            self.assertEqual(played[0][0], "afplay")
+            self.assertTrue(str(played[0][1]).startswith(str(mod.COMBO_DIR)))
+            # A missing piece means no joined file -- fall through to Hume.
+            self.assertIsNone(a.assembled(pieces[:-1] + ["number 999."]))
 
 
 class TestNoRobotVoice(unittest.TestCase):

@@ -679,10 +679,10 @@ class HockeyMusicApp:
     # Announcements
     # =====================================================================
 
-    def announce(self, text, celebration=None):
+    def announce(self, text, celebration=None, pieces=None):
         """Queue a PA announcement. Returns immediately."""
         self.announcer.announce(text, celebration=celebration,
-                                on_status=self._status_from_thread)
+                                on_status=self._status_from_thread, pieces=pieces)
 
     def _status_from_thread(self, message):
         self.root.after(0, lambda: self.status_var.set(message))

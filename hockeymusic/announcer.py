@@ -33,6 +33,12 @@ GAP_AFTER_CALL = 0.15        # seconds between the last word and the clip
 SILENCE = 0.02               # amplitude below this counts as silence (0..1)
 _PCM = "LEI16@44100"
 
+# Joining away-goal pieces: Hume pads every line with silence at both ends.
+# Trimmed to these, a call joined from pieces keeps a speaker's rhythm.
+PAUSE_AFTER_COMMA = 0.18     # "number 12," | "assisted by"
+PAUSE_BETWEEN = 0.05         # "Goal scored by" | "number 12,"
+EDGE = 0.02                  # silence kept at each trimmed edge
+
 
 def _decode_pcm(src, dst):
     """Any audio afplay can read -> 16-bit 44.1k stereo WAV. Returns True on success."""
@@ -50,6 +56,57 @@ def _trim_tail(samples, channels, rate, keep=GAP_AFTER_CALL):
     end = min(len(samples), last + 1 + int(keep * rate) * channels)
     end -= end % channels
     return samples[:end]
+
+
+def _trim_head(samples, channels, rate, keep=0.0):
+    """Drop leading silence from an int16 array, keeping `keep` seconds of it."""
+    limit = int(SILENCE * 32767)
+    first = 0
+    while first < len(samples) and abs(samples[first]) < limit:
+        first += 1
+    start = max(0, first - first % channels - int(keep * rate) * channels)
+    return samples[start:]
+
+
+def join(parts, out_path):
+    """Write [(audio_path, pause_after), ...] as one WAV, each part trimmed of
+    silence at both ends. The last part keeps its pause as a tail. Returns
+    out_path or None."""
+    temps = []
+    try:
+        audio, fmt = array.array("h"), None
+        for i, (src, pause) in enumerate(parts):
+            tmp = out_path.with_suffix(f".{i}.wav")
+            temps.append(tmp)
+            if not _decode_pcm(src, tmp):
+                return None
+            with wave.open(str(tmp)) as w:
+                this = (w.getframerate(), w.getnchannels(), w.getsampwidth())
+                if fmt and this != fmt:
+                    return None
+                fmt = this
+                a = array.array("h"); a.frombytes(w.readframes(w.getnframes()))
+            rate, ch = fmt[0], fmt[1]
+            # A hair of the silence stays so a soft first or last sound isn't clipped.
+            a = _trim_tail(_trim_head(a, ch, rate, EDGE), ch, rate, EDGE)
+            audio.extend(a)
+            audio.extend([0] * (int(pause * rate) * ch))
+        if fmt is None:
+            return None
+        tmp_out = out_path.with_suffix(".part")
+        with wave.open(str(tmp_out), "wb") as w:
+            w.setnchannels(fmt[1]); w.setsampwidth(2); w.setframerate(fmt[0])
+            w.writeframes(audio.tobytes())
+        tmp_out.replace(out_path)
+        return out_path
+    except (OSError, wave.Error, EOFError):
+        return None
+    finally:
+        for t in temps:
+            try:
+                t.unlink()
+            except OSError:
+                pass
 
 
 def stitch(announcement, celebration, out_path):
@@ -264,15 +321,17 @@ class Announcer:
 
     # -- playback ---------------------------------------------------------
 
-    def announce(self, text, celebration=None, on_status=None):
+    def announce(self, text, celebration=None, on_status=None, pieces=None):
         """Queue an announcement. Returns immediately; never blocks the UI.
 
         `celebration` is an optional sound-clip path played right after.
+        `pieces` are short cached lines that together say `text` (an away
+        goal); they're joined and played when `text` itself isn't cached.
         `on_status` is called from the worker thread with progress strings --
         wrap it in `root.after` before touching widgets.
         """
         self._ensure_worker()
-        self._jobs.put((text, celebration, on_status))
+        self._jobs.put((text, celebration, on_status, pieces))
 
     def _ensure_worker(self):
         if self._worker is None or not self._worker.is_alive():
@@ -281,24 +340,30 @@ class Announcer:
 
     def _run_jobs(self):
         while True:
-            text, celebration, on_status = self._jobs.get()
+            text, celebration, on_status, pieces = self._jobs.get()
             try:
-                self._play_one(text, celebration, on_status)
+                self._play_one(text, celebration, on_status, pieces)
             except Exception as e:                     # keep the worker alive
                 print(f"❌ Announcement failed: {e}")
             finally:
                 self._jobs.task_done()
 
-    def _play_one(self, text, celebration, on_status):
+    def _play_one(self, text, celebration, on_status, pieces=None):
         def status(msg):
             if on_status:
                 on_status(msg)
 
+        use_cache = self.config.get("announcer.use_cache", True)
         cached = self.is_cached(text)
-        status("📢 Announcing…" if cached else "📢 Rendering announcement…")
+        # Order: the whole line cached -> joined from cached pieces -> render
+        # the whole line from Hume -> skip.
+        audio = None
+        if use_cache and not cached and pieces:
+            audio = self.assembled(pieces)
+        status("📢 Announcing…" if cached or audio else "📢 Rendering announcement…")
 
-        audio = self.render(text) if self.config.get("announcer.use_cache", True) \
-            else self.render(text, force=True)
+        if not audio:
+            audio = self.render(text) if use_cache else self.render(text, force=True)
 
         if not audio and not self.config.get("announcer.fallback_enabled", False):
             # Josh would rather a goal go unannounced than robot-voiced. Leave
@@ -323,6 +388,31 @@ class Announcer:
                 subprocess.run(["afplay", str(celebration)], check=False)
         finally:
             self._unduck(ducked)
+
+    def pieces_cached(self, pieces):
+        return bool(pieces) and all(self.is_cached(p) for p in pieces)
+
+    def assembled(self, pieces):
+        """One file joined from cached pieces, or None if any piece is missing.
+
+        Saved under combo/ keyed on each piece's file and mtime, so the second
+        time a call is made it plays straight from disk.
+        """
+        if not self.pieces_cached(pieces):
+            return None
+        try:
+            files = [self.cache_path(p) for p in pieces]
+            key = "pieces|" + "|".join(f"{f.name}:{f.stat().st_mtime_ns}" for f in files)
+            out = COMBO_DIR / (hashlib.sha256(key.encode()).hexdigest()[:20] + ".wav")
+            if out.exists() and out.stat().st_size > 0:
+                return out
+            COMBO_DIR.mkdir(parents=True, exist_ok=True)
+            parts = [(f, PAUSE_AFTER_COMMA if p.endswith(",") else PAUSE_BETWEEN)
+                     for f, p in zip(files, pieces)]
+            parts[-1] = (parts[-1][0], GAP_AFTER_CALL)
+            return join(parts, out)
+        except OSError:
+            return None
 
     def combined(self, audio, celebration):
         """Announcement + celebration as one cached file, or None if stitching fails.

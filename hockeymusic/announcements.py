@@ -41,6 +41,42 @@ def goal(team, scorer, assists=(), roster=None, team_name="Patriots"):
     return f"{text}, unassisted."
 
 
+# Jersey numbers a visiting player can wear. "00" is real in youth hockey.
+AWAY_NUMBERS = ["0", "00"] + [str(n) for n in range(1, 100)]
+
+
+def away_goal_pieces(scorer, assists=()):
+    """The away goal call as short lines, each rendered once and joined at the rink.
+
+    Every combination of scorer and assists would be about a million lines, so
+    each number is rendered twice instead: "number 12," with the voice rising
+    (mid-sentence) and "number 12." falling (the end). Read together the pieces
+    say exactly what goal("away", ...) says, minus a comma or two; the test
+    holds them to it. Returns None if any number isn't a renderable jersey.
+    """
+    numbers = [str(scorer).strip().lstrip("#")]
+    numbers += [str(a).strip().lstrip("#") for a in assists if a and str(a).strip()]
+    if any(n not in AWAY_NUMBERS for n in numbers):
+        return None
+    scorer, assists = numbers[0], numbers[1:3]
+    pieces = ["Goal scored by", f"number {scorer},"]
+    if len(assists) == 2:
+        return pieces + ["assisted by", f"number {assists[0]},", "and",
+                         f"number {assists[1]}."]
+    if len(assists) == 1:
+        return pieces + ["assisted by", f"number {assists[0]}."]
+    return pieces + ["unassisted."]
+
+
+def away_piece_manifest():
+    """(cache_key, text) for every away-goal piece: 4 phrases + 2 per number."""
+    items = [(f"away_{t.rstrip('.').replace(' ', '_')}", t)
+             for t in ("Goal scored by", "assisted by", "and", "unassisted.")]
+    items += [(f"away_mid_{n}", f"number {n},") for n in AWAY_NUMBERS]
+    items += [(f"away_end_{n}", f"number {n}.") for n in AWAY_NUMBERS]
+    return items
+
+
 def visiting_goal(visiting_team, scorer, assists=(), roster=None):
     """A visiting goal when we DO have their roster (photo of the game sheet).
     Same flat tone as the nameless version, but with the name."""
@@ -75,6 +111,7 @@ PRERENDER_SCOPES = {
     "lineup": "Starting lineup only",
     "basic": "Lineup + every unassisted goal call",
     "full": "Lineup + goal calls with each single assist",
+    "away": "Away goal pieces (any number, any assists)",
 }
 
 
@@ -87,10 +124,13 @@ def prerender_manifest(roster, team_name="Patriots", scope="basic"):
       lineup -- N+1 lines
       basic  -- N+1 lineup, plus N unassisted goal calls
       full   -- adds N*(N-1) single-assist calls (the common case in a game)
+      away   -- the ~206 away-goal pieces; no roster needed
 
     Anything not cached still synthesises live, so a smaller scope only costs
     you latency on the rarer calls.
     """
+    if scope == "away":
+        return away_piece_manifest()
     items = list(lineup_sequence(roster, team_name))
     if scope == "lineup":
         return items

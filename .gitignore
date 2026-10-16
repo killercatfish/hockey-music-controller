@@ -93,6 +93,7 @@ docs/_build/
 # Optional: Uncomment if you want to exclude user-specific files
 rosters/*.csv
 sound_clips/*.m4a
+sound_clips/josh-recordings/
 
 # Spotify token cache
 .cache

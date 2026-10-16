@@ -23,6 +23,7 @@ import wave
 from pathlib import Path
 
 from . import paths
+from .voice import RecordedVoice
 
 QUOTA_BACKOFF = 10 * 60      # seconds to skip Hume after a 429
 
@@ -184,6 +185,7 @@ class Announcer:
         # a goal call falls straight through to the macOS voice instead of
         # waiting on a request that is going to fail anyway.
         self.quota_exhausted_at = None
+        self.voice = RecordedVoice()
         paths.ensure_dirs()
 
     # -- capability -------------------------------------------------------
@@ -217,6 +219,14 @@ class Announcer:
         if not HUME_API_KEY:
             return "macOS voice (no HUME_API_KEY in .env)"
         return "macOS voice"
+
+    @property
+    def use_recorded(self):
+        """Home calls in Josh's recorded voice (Settings). Off = Hume, as before."""
+        return self.config.get("announcer.home_voice", "recorded") == "recorded"
+
+    def recorded_ready(self, lines):
+        return bool(lines) and self.use_recorded and self.voice.has_all(lines)
 
     # -- cache ------------------------------------------------------------
 
@@ -321,17 +331,21 @@ class Announcer:
 
     # -- playback ---------------------------------------------------------
 
-    def announce(self, text, celebration=None, on_status=None, pieces=None):
+    def announce(self, text, celebration=None, on_status=None, pieces=None,
+                 recorded=None):
         """Queue an announcement. Returns immediately; never blocks the UI.
 
         `celebration` is an optional sound-clip path played right after.
         `pieces` are short cached lines that together say `text` (an away
         goal); they're joined and played when `text` itself isn't cached.
+        `recorded` are lines in Josh's recorded voice that together say `text`
+        (a home call); when they're all recorded and Settings picks that voice,
+        they win over Hume.
         `on_status` is called from the worker thread with progress strings --
         wrap it in `root.after` before touching widgets.
         """
         self._ensure_worker()
-        self._jobs.put((text, celebration, on_status, pieces))
+        self._jobs.put((text, celebration, on_status, pieces, recorded))
 
     def _ensure_worker(self):
         if self._worker is None or not self._worker.is_alive():
@@ -340,18 +354,25 @@ class Announcer:
 
     def _run_jobs(self):
         while True:
-            text, celebration, on_status, pieces = self._jobs.get()
+            text, celebration, on_status, pieces, recorded = self._jobs.get()
             try:
-                self._play_one(text, celebration, on_status, pieces)
+                self._play_one(text, celebration, on_status, pieces, recorded)
             except Exception as e:                     # keep the worker alive
                 print(f"❌ Announcement failed: {e}")
             finally:
                 self._jobs.task_done()
 
-    def _play_one(self, text, celebration, on_status, pieces=None):
+    def _play_one(self, text, celebration, on_status, pieces=None, recorded=None):
         def status(msg):
             if on_status:
                 on_status(msg)
+
+        if self.recorded_ready(recorded):
+            audio = self.voice.assembled(recorded)
+            if audio:
+                status("🎙 Announcing…")
+                self._play(audio, celebration, text, status)
+                return
 
         use_cache = self.config.get("announcer.use_cache", True)
         cached = self.is_cached(text)
@@ -371,6 +392,10 @@ class Announcer:
             status(f"⛔ Not announced (no Hume audio): {text}")
             return
 
+        self._play(audio, celebration, text, status)
+
+    def _play(self, audio, celebration, text, status):
+        """Duck, play `audio` (or the macOS voice if None), then the celebration."""
         ducked = self._duck()
         try:
             if audio:

@@ -17,6 +17,9 @@ DEFAULT_ROSTER = ROSTER_DIR / "patriots_roster_2025.csv"
 # User data lives outside the repo so it survives a git pull.
 DATA_DIR = Path.home() / ".hockey_music"
 TTS_CACHE_DIR = DATA_DIR / "tts_cache"
+# Josh's own recorded pieces; separate from the Hume cache so neither can
+# clobber the other.
+VOICE_DIR = DATA_DIR / "voice" / "josh"
 
 # Kept at the legacy location so existing setups keep their songs.
 CONFIG_FILE = Path.home() / "hockey_music_config.json"

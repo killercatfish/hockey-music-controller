@@ -74,6 +74,29 @@ class TestAnnouncements(unittest.TestCase):
                 self.assertLessEqual(
                     set(announcements.away_goal_pieces(scorer, assists)), texts)
 
+    def test_home_pieces_say_the_same_words_as_the_full_call(self):
+        # Invariant 1 for the recorded voice: same words as goal("home", ...).
+        import re
+        words = lambda t: re.sub(r"[^a-z0-9 ]", "", t.lower()).split()
+        r = demo_roster()
+        for scorer, assists in (("7", []), ("7", ["5"]), ("7", ["5", "10"])):
+            pieces = announcements.home_goal_pieces(scorer, assists, r)
+            self.assertEqual(words(" ".join(pieces)),
+                             words(announcements.goal("home", scorer, assists, r)))
+            self.assertLessEqual(set(pieces), set(announcements.home_piece_manifest(r)))
+
+    def test_home_pieces_need_every_number_on_the_roster(self):
+        self.assertIsNone(announcements.home_goal_pieces("99", [], demo_roster()))
+        self.assertIsNone(announcements.home_goal_pieces("7", ["99"], demo_roster()))
+
+    def test_lineup_line_is_the_recorded_landing_piece(self):
+        # The lineup reuses each player's "Number 7, Name!" recording; that only
+        # works while the two strings agree (position blank).
+        from hockeymusic.roster import Player
+        p = Player("7", "Alexander Mellen")
+        self.assertEqual(announcements.lineup_player(p),
+                         announcements.player_called("7", "Alexander Mellen"))
+
     def test_away_pieces_refuse_odd_numbers(self):
         self.assertIsNone(announcements.away_goal_pieces("100"))
         self.assertIsNone(announcements.away_goal_pieces("7", ["A"]))
@@ -398,6 +421,67 @@ class TestStitch(unittest.TestCase):
             self.assertTrue(str(played[0][1]).startswith(str(mod.COMBO_DIR)))
             # A missing piece means no joined file -- fall through to Hume.
             self.assertIsNone(a.assembled(pieces[:-1] + ["number 999."]))
+
+
+class TestRecordedVoice(unittest.TestCase):
+    """Home calls joined from Josh's own clips; Hume stays one switch away."""
+
+    def setUp(self):
+        import json
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        r = demo_roster()
+        self.text = announcements.goal("home", "7", ["5"], r)
+        self.lines = announcements.home_goal_pieces("7", ["5"], r)
+        clips = {}
+        for i, line in enumerate(self.lines):
+            TestStitch._wav(None, self.dir / f"{i}.wav", 0.6, silent_tail=0.2)
+            clips[line] = [f"{i}.wav"]
+        TestStitch._wav(None, self.dir / "alt.wav", 0.5)
+        clips[self.lines[0]].append("alt.wav")              # a second GOAL!! take
+        (self.dir / "manifest.json").write_text(json.dumps({"clips": clips}))
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _play(self, home_voice, lines):
+        from hockeymusic import announcer as mod
+        from hockeymusic.voice import RecordedVoice
+        a = mod.Announcer(Config({"announcer": {"home_voice": home_voice}}))
+        a.voice = RecordedVoice(self.dir)
+        hume = []
+        a.render = lambda text, force=False: hume.append(text)
+        played = []
+        real_run = mod.subprocess.run
+        mod.subprocess.run = lambda cmd, **kw: (
+            real_run(cmd, **kw) if cmd[0] == "afconvert" else played.append(cmd))
+        try:
+            a._play_one(self.text, None, None, None, lines)
+        finally:
+            mod.subprocess.run = real_run
+        return played, hume
+
+    def test_recorded_voice_plays_without_hume(self):
+        played, hume = self._play("recorded", self.lines)
+        self.assertEqual(hume, [])
+        self.assertEqual(len(played), 1)
+        self.assertIn(str(self.dir / "joined"), str(played[0][1]))
+
+    def test_hume_setting_ignores_the_recordings(self):
+        _, hume = self._play("hume", self.lines)
+        self.assertEqual(hume, [self.text])
+
+    def test_a_missing_recording_falls_back_to_hume(self):
+        _, hume = self._play("recorded", self.lines[:-1] + ["Number 99, Nobody!"])
+        self.assertEqual(hume, [self.text])
+
+    def test_manifest_and_rotation(self):
+        from hockeymusic.voice import RecordedVoice
+        v = RecordedVoice(self.dir)
+        self.assertEqual(len(v), len(self.lines))
+        takes = {v.take(self.lines[0]).name for _ in range(60)}
+        self.assertEqual(takes, {"0.wav", "alt.wav"})
+        self.assertEqual(len(RecordedVoice(self.dir / "nowhere")), 0)
 
 
 class TestNoRobotVoice(unittest.TestCase):

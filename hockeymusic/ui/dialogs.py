@@ -243,6 +243,20 @@ class SettingsDialog:
         self.cache_label.grid(row=6, column=0, sticky=tk.W)
         ttk.Button(tab, text="Clear cache", command=self._clear_cache
                    ).grid(row=6, column=1, sticky=tk.W, padx=8)
+
+        # Home calls: Josh's recorded pieces, or the Hume cache. Both stay on
+        # disk; this only picks which one plays. Missing pieces fall back to Hume.
+        ttk.Separator(tab, orient="horizontal").grid(row=13, column=0, columnspan=2,
+                                                     sticky="ew", pady=14)
+        self.home_voice = tk.StringVar(value=cfg.get("announcer.home_voice", "recorded"))
+        voice_row = ttk.Frame(tab)
+        voice_row.grid(row=14, column=0, columnspan=2, sticky=tk.W)
+        ttk.Label(voice_row, text="Home goals + lineup voice:").pack(side=tk.LEFT)
+        ttk.Radiobutton(voice_row, text=f"My recordings ({len(announcer.voice)} lines)",
+                        value="recorded", variable=self.home_voice
+                        ).pack(side=tk.LEFT, padx=8)
+        ttk.Radiobutton(voice_row, text="Hume", value="hume", variable=self.home_voice
+                        ).pack(side=tk.LEFT)
         return tab
 
     def _clear_cache(self):
@@ -264,6 +278,7 @@ class SettingsDialog:
         cfg.set("announcer.default_celebration", self.default_clip.get().strip())
         cfg.set("announcer.fallback_voice", self.fallback_voice.get())
         cfg.set("announcer.fallback_enabled", bool(self.fallback_enabled.get()))
+        cfg.set("announcer.home_voice", self.home_voice.get())
         cfg.save()
         _write_env_file({"HUME_API_KEY": self.hume_key.get().strip(),
                          "HUME_VOICE_ID": self.hume_voice.get().strip()})

@@ -679,10 +679,11 @@ class HockeyMusicApp:
     # Announcements
     # =====================================================================
 
-    def announce(self, text, celebration=None, pieces=None):
+    def announce(self, text, celebration=None, pieces=None, recorded=None):
         """Queue a PA announcement. Returns immediately."""
         self.announcer.announce(text, celebration=celebration,
-                                on_status=self._status_from_thread, pieces=pieces)
+                                on_status=self._status_from_thread, pieces=pieces,
+                                recorded=recorded)
 
     def _status_from_thread(self, message):
         self.root.after(0, lambda: self.status_var.set(message))
@@ -692,7 +693,9 @@ class HockeyMusicApp:
             messagebox.showwarning("No roster", "Load a roster first.")
             return
         items = announcements.lineup_sequence(self.roster, self.config.team_name)
-        uncached = sum(1 for _, text in items if not self.announcer.is_cached(text))
+        ready = lambda text: (self.announcer.recorded_ready([text])
+                              or self.announcer.is_cached(text))
+        uncached = sum(1 for _, text in items if not ready(text))
         if uncached and not messagebox.askyesno(
                 "Announce lineup",
                 f"{len(items)} lines, {uncached} not yet cached.\n\n"
@@ -700,7 +703,7 @@ class HockeyMusicApp:
                 "rink wifi. Pre-render them for instant playback.\n\nAnnounce anyway?"):
             return
         for _key, text in items:
-            self.announce(text)
+            self.announce(text, recorded=[text])
         self.status_var.set(f"🎙 Announcing lineup ({len(items)} lines)…")
 
     # =====================================================================

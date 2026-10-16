@@ -129,10 +129,12 @@ class UITestCase(unittest.TestCase):
 
         self.tmp = tempfile.TemporaryDirectory()
         tmp_path = Path(self.tmp.name)
-        self._saved = (paths.CONFIG_FILE, paths.DATA_DIR, paths.TTS_CACHE_DIR)
+        self._saved = (paths.CONFIG_FILE, paths.DATA_DIR, paths.TTS_CACHE_DIR,
+                       paths.VOICE_DIR)
         paths.CONFIG_FILE = tmp_path / "config.json"
         paths.DATA_DIR = tmp_path / "data"
         paths.TTS_CACHE_DIR = tmp_path / "data" / "tts"
+        paths.VOICE_DIR = tmp_path / "data" / "voice"
 
         # No Apple Music, no polling loop -- the fake stands in for both.
         self.app = main_window.HockeyMusicApp(
@@ -140,17 +142,20 @@ class UITestCase(unittest.TestCase):
         # Never let a test hit the network or play audio.
         self.announced = []
         self.announced_pieces = []
+        self.announced_recorded = []
 
-        def fake_announce(text, celebration=None, pieces=None):
+        def fake_announce(text, celebration=None, pieces=None, recorded=None):
             self.announced.append(text)
             self.announced_pieces.append(pieces)
+            self.announced_recorded.append(recorded)
         self.app.announce = fake_announce
         self.app.pool.playlist = "Stoppage Music"
         self.app.load_pool_tracks(quiet=True)
 
     def tearDown(self):
         self.app.root.destroy()
-        paths.CONFIG_FILE, paths.DATA_DIR, paths.TTS_CACHE_DIR = self._saved
+        (paths.CONFIG_FILE, paths.DATA_DIR, paths.TTS_CACHE_DIR,
+         paths.VOICE_DIR) = self._saved
         self.tmp.cleanup()
 
     def pump(self):
@@ -395,6 +400,46 @@ class TestDialogs(UITestCase):
         dialog.announce()
         self.assertEqual(self.announced, [announcements.goal("away", "12", ["7", ""])])
         self.assertEqual(self.announced_pieces, [pieces])
+
+    def test_home_goal_in_recorded_voice(self):
+        import json
+        from hockeymusic import announcements
+        from hockeymusic.roster import Player
+        from hockeymusic.ui.goal_dialog import GoalDialog
+
+        self.app.roster.players["7"] = Player("7", "Alexander Mellen")
+        self.app.roster.players["10"] = Player("10", "Cale Kulig")
+        lines = announcements.home_goal_pieces("7", ["10"], self.app.roster,
+                                               self.app.config.team_name)
+        paths.VOICE_DIR.mkdir(parents=True)
+        for i, line in enumerate(lines):
+            (paths.VOICE_DIR / f"{i}.wav").write_bytes(b"x")
+        (paths.VOICE_DIR / "manifest.json").write_text(json.dumps(
+            {"clips": {line: [f"{i}.wav"] for i, line in enumerate(lines)}}))
+        self.app.announcer.voice.reload()
+
+        dialog = GoalDialog(self.app)
+        dialog.scorer.set("7")
+        dialog.assist1.set("10")
+        self.pump()
+        self.assertIn("Your voice", dialog.cache_label.cget("text"))
+
+        self.app.config.set("announcer.home_voice", "hume")    # back to Hume
+        dialog._refresh()
+        self.assertNotIn("Your voice", dialog.cache_label.cget("text"))
+
+        dialog.announce()
+        self.assertEqual(self.announced_recorded, [lines])
+
+    def test_settings_switches_home_voice(self):
+        from hockeymusic.ui.dialogs import SettingsDialog
+
+        dialog = SettingsDialog(self.app)
+        self.assertEqual(dialog.home_voice.get(), "recorded")
+        dialog.home_voice.set("hume")
+        dialog._save()
+        self.assertEqual(self.app.config.get("announcer.home_voice"), "hume")
+        self.assertFalse(self.app.announcer.use_recorded)
 
     def test_goal_dialog_quick_pick_advances_fields(self):
         from hockeymusic.roster import Player

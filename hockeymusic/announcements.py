@@ -77,6 +77,45 @@ def away_piece_manifest():
     return items
 
 
+def player_called(number, name, last=True):
+    """A player as a recorded piece: 'Number 7, Alexander Mellen!' to land a
+    sentence, 'number 7, Alexander Mellen' (voice rising) when more follows."""
+    return f"Number {number}, {name}!" if last else f"number {number}, {name}"
+
+
+def home_goal_pieces(scorer, assists=(), roster=None, team_name="Patriots"):
+    """The home goal call as recorded pieces, joined at the rink.
+
+    Each rostered player is recorded twice (landing and rising), plus a few
+    phrases. Read together they say what goal("home", ...) says; the test holds
+    them to it. Returns None if any number isn't on the roster -- there's no
+    recording of a name we don't have.
+    """
+    numbers = [str(scorer).strip().lstrip("#")]
+    numbers += [str(a).strip().lstrip("#") for a in assists if a and str(a).strip()]
+    names = [roster.display_name(n) if roster else None for n in numbers]
+    if not all(names):
+        return None
+    called = list(zip(numbers, names))[:3]
+    pieces = [f"{team_name} GOAL!!", "Scored by", player_called(*called[0])]
+    if len(called) == 3:
+        return pieces + ["Assisted by", player_called(*called[1], last=False), "and",
+                         player_called(*called[2])]
+    if len(called) == 2:
+        return pieces + ["Assisted by", player_called(*called[1])]
+    return pieces + ["Unassisted!"]
+
+
+def home_piece_manifest(roster, team_name="Patriots"):
+    """Every line the recorded home voice needs: phrases + two per player."""
+    items = [f"{team_name} GOAL!!", "Scored by", "Assisted by", "and", "Unassisted!",
+             lineup_intro(team_name)]
+    for p in roster.sorted_players():
+        items += [player_called(p.number, p.display_name),
+                  player_called(p.number, p.display_name, last=False)]
+    return items
+
+
 def visiting_goal(visiting_team, scorer, assists=(), roster=None):
     """A visiting goal when we DO have their roster (photo of the game sheet).
     Same flat tone as the nameless version, but with the name."""

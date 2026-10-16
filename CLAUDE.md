@@ -24,8 +24,8 @@ tkinter, Apple Music must be running. Currently developed on Python 3.14.
 bash launch.sh                    # checks deps, opens Music, launches
 python3 hockey_music_controller.py
 
-python3 tests/test_core.py        # 39 tests: copy, roster, playlists, migration, clip sharing
-python3 tests/test_ui_smoke.py    # 24 tests: builds every window
+python3 tests/test_core.py        # 51 tests: copy, roster, playlists, migration, clip sharing, recorded voice
+python3 tests/test_ui_smoke.py    # 27 tests: builds every window
 python3 tests/test_hype.py        # 20 tests: chorus detection, proposal apply, game-deck split
 
 python3 hype_points.py propose|show|apply|revert   # clip starts at the chorus (docs/HYPE_POINTS.md)
@@ -51,6 +51,7 @@ hockeymusic/
   roster.py           Player/Roster dataclasses, CSV load/save
   announcements.py    ALL announcement copy
   announcer.py        Hume TTS, disk cache, async playback queue
+  voice.py            Josh's recorded clips joined into home calls (docs/RECORDED_VOICE.md)
   playlists.py        Pool/PoolSet, Clip, shuffle, family-safe filter, cross-pool clip lookup
   hype.py             chorus detection from LRCLIB synced lyrics; propose/apply/revert CLI
   gameday.py          deal a pool into N disjoint Apple Music playlists + register pools
@@ -67,6 +68,7 @@ docs/                 feature guides (see below)
 **User data lives outside the repo:**
 - `~/hockey_music_config.json` — settings, pools, clip points
 - `~/.hockey_music/tts_cache/` — pre-rendered announcement audio (`*.wav`)
+- `~/.hockey_music/voice/josh/` — Josh's recorded home-call clips + `manifest.json`
 - `~/.hockey_music/.env` — Hume key (preferred over a repo `.env`)
 - `~/.hockey_music/lyrics_cache/` — LRCLIB responses (misses cached too)
 - `~/.hockey_music/hype_proposals.json` — last `hype_points.py propose` run
@@ -169,6 +171,13 @@ pools. `hype_points.py` (chorus start points from LRCLIB synced lyrics) and
 `game_playlists.py` (disjoint per-game decks). The 458 clip starts that existed
 before were bulk genre defaults (5/8/10/12s), not hand-tuned — that's why
 `apply` overwrites without a per-track keep list.
+
+**Recorded voice (2026-10-15).** Home goals and the lineup play in Josh's own
+voice, joined from 40 clips he recorded (docs/RECORDED_VOICE.md). Settings
+switches home calls back to Hume; the Hume cache was not touched. Clip keys are
+the exact strings from `home_goal_pieces()`, so a wording change in
+`player_called()` orphans every recording, the same way it would re-key the
+Hume cache.
 
 **Audio analysis is off the table:** 437 of 479 tracks in the master playlist
 are Apple Music subscription tracks (DRM). Only ~41 have local files. Lyrics

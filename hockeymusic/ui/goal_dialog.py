@@ -141,7 +141,9 @@ class GoalDialog:
 
         if text:
             ann = self.app.announcer
-            if ann.is_cached(text):
+            if ann.recorded_ready(self._recorded()):
+                msg, colour = "🎙 Your voice — plays offline", "#0a6"
+            elif ann.is_cached(text):
                 msg, colour = "⚡ Cached — plays instantly, no wifi needed", "#0a6"
             elif ann.pieces_cached(self._pieces()):
                 msg, colour = "🧩 Assembled from pieces — plays offline", "#0a6"
@@ -184,6 +186,15 @@ class GoalDialog:
         return announcements.away_goal_pieces(
             scorer, [self.assist1.get().strip(), self.assist2.get().strip()])
 
+    def _recorded(self):
+        """Home goals only: Josh's recorded pieces that say the same call."""
+        scorer = self.scorer.get().strip()
+        if self.team.get() != "home" or not scorer:
+            return None
+        return announcements.home_goal_pieces(
+            scorer, [self.assist1.get().strip(), self.assist2.get().strip()],
+            self.roster, self.app.config.team_name)
+
     # -- action -----------------------------------------------------------
 
     def announce(self):
@@ -208,7 +219,8 @@ class GoalDialog:
             found = paths.sound_clip(clip)
             celebration = str(found) if found else None
 
-        self.app.announce(self._text(), celebration=celebration, pieces=self._pieces())
+        self.app.announce(self._text(), celebration=celebration, pieces=self._pieces(),
+                          recorded=self._recorded())
         self.win.destroy()
 
 

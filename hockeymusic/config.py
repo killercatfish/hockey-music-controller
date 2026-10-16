@@ -1,5 +1,6 @@
 """Persistent settings, with migration from the v1/v2 flat config."""
 
+import copy
 import json
 
 from . import paths
@@ -56,6 +57,7 @@ DEFAULTS = {
         "fallback_enabled": False,   # off: a line Hume can't render is skipped, not robot-voiced
         "default_celebration": "woo.m4a",
         "play_song_on_announce": False,  # the GOAL button already played it
+        "home_voice": "recorded",    # Josh's recorded pieces; "hume" = the Hume cache
     },
 }
 
@@ -75,7 +77,8 @@ class Config:
     """Dict-backed config with dotted-path access."""
 
     def __init__(self, data=None):
-        self.data = _deep_merge(DEFAULTS, data or {})
+        # Deep copy: set() on a fresh config must not write into DEFAULTS.
+        self.data = _deep_merge(copy.deepcopy(DEFAULTS), data or {})
 
     # -- persistence ------------------------------------------------------
 

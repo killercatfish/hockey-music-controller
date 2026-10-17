@@ -36,6 +36,8 @@ class HockeyMusicApp:
         self.position = 0            # index into the active pool's order
         self.visible = []            # listbox row -> position in order
         self.active_clip = None      # (track, Clip) currently playing
+        self.goal_panel = None       # the docked GoalDialog, while it's open
+        self._goal_extra = 0         # width added to the window to fit it
         self._drag_from = None
 
         self.status_var = tk.StringVar(value="Ready")
@@ -75,7 +77,11 @@ class HockeyMusicApp:
     # =====================================================================
 
     def _build(self):
-        top = ttk.Frame(self.root, padding=(10, 10, 10, 0))
+        # Everything but the docked goal panel, which packs to the right of it.
+        self.body = ttk.Frame(self.root)
+        self.body.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        top = ttk.Frame(self.body, padding=(10, 10, 10, 0))
         top.pack(fill=tk.X)
 
         tk.Button(top, text="🥅  GOAL!  🏒", command=self.play_goal_song,
@@ -119,7 +125,7 @@ class HockeyMusicApp:
         row = ttk.Frame(parent)
         row.pack(fill=tk.X, pady=4)
         specs = [
-            ("📢 Goal Announcement", "#FFA500", lambda: GoalDialog(self)),
+            ("📢 Goal Announcement", "#FFA500", self.open_goal_panel),
             ("🎙 Starting Lineup", "#16A085", self.announce_lineup),
             ("🏁 Final Score", "#9B59B6", lambda: FinalScoreDialog(self)),
         ]
@@ -149,7 +155,7 @@ class HockeyMusicApp:
                   foreground="#555", wraplength=920).pack(anchor="w")
 
     def _build_playlist(self):
-        frame = ttk.LabelFrame(self.root, text="Playlist", padding=8)
+        frame = ttk.LabelFrame(self.body, text="Playlist", padding=8)
         frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=8)
 
         pool_row = ttk.Frame(frame)
@@ -206,7 +212,7 @@ class HockeyMusicApp:
         self.listbox.bind("<ButtonRelease-1>", self._click_release)
 
     def _build_footer(self):
-        footer = ttk.Frame(self.root, padding=(10, 0, 10, 10))
+        footer = ttk.Frame(self.body, padding=(10, 0, 10, 10))
         footer.pack(fill=tk.X)
 
         buttons = ttk.Frame(footer)
@@ -235,7 +241,7 @@ class HockeyMusicApp:
             "s": self.stop,
             "o": lambda: self.play_event("power_play", "Power Play"),
             "p": lambda: self.play_event("penalty_kill", "Penalty Kill"),
-            "a": lambda: GoalDialog(self),
+            "a": self.open_goal_panel,
             "l": self.announce_lineup,
         }
         for key, action in actions.items():
@@ -678,6 +684,34 @@ class HockeyMusicApp:
     # =====================================================================
     # Announcements
     # =====================================================================
+
+    def open_goal_panel(self):
+        """Dock the goal call on the right; the console stays usable beside it.
+
+        The window widens to fit the panel (as far as the screen allows) and
+        shrinks back when it closes, so the playlist doesn't get squeezed.
+        """
+        if self.goal_panel:
+            self.goal_panel.focus()
+            return self.goal_panel
+        self.goal_panel = GoalDialog(self, on_close=self._goal_panel_closed)
+        self.goal_panel.win.pack(side=tk.RIGHT, fill=tk.Y, before=self.body)
+        self.root.update_idletasks()
+        width, height = self.root.winfo_width(), self.root.winfo_height()
+        room = self.root.winfo_screenwidth() - self.root.winfo_x() - width
+        self._goal_extra = max(0, min(self.goal_panel.win.winfo_reqwidth(), room))
+        if self._goal_extra:
+            self.root.geometry(f"{width + self._goal_extra}x{height}")
+        self.goal_panel.focus()
+        return self.goal_panel
+
+    def _goal_panel_closed(self):
+        self.goal_panel = None
+        if self._goal_extra:
+            width, height = self.root.winfo_width(), self.root.winfo_height()
+            self.root.geometry(f"{max(width - self._goal_extra, 1)}x{height}")
+            self._goal_extra = 0
+        self._release_focus()
 
     def announce(self, text, celebration=None, pieces=None, recorded=None):
         """Queue a PA announcement. Returns immediately."""

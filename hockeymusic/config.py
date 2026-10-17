@@ -57,7 +57,7 @@ DEFAULTS = {
         "fallback_enabled": False,   # off: a line Hume can't render is skipped, not robot-voiced
         "default_celebration": "woo.m4a",
         "play_song_on_announce": False,  # the GOAL button already played it
-        "home_voice": "recorded",    # Josh's recorded pieces; "hume" = the Hume cache
+        "home_voice": "hume",        # the Hume cache; "recorded" = Josh's recorded pieces
     },
 }
 

@@ -108,7 +108,7 @@ Without Hume, announcements fall back to a macOS voice.
 | **S** | Stop (fade out) |
 | **O** | Power play |
 | **P** | Penalty kill |
-| **A** | Goal announcement dialog |
+| **A** | Goal announcement panel (docks on the right; music stays live) |
 | **L** | Starting lineup |
 
 Shortcuts are ignored while you are typing in a field.

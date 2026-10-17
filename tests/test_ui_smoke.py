@@ -417,6 +417,7 @@ class TestDialogs(UITestCase):
         (paths.VOICE_DIR / "manifest.json").write_text(json.dumps(
             {"clips": {line: [f"{i}.wav"] for i, line in enumerate(lines)}}))
         self.app.announcer.voice.reload()
+        self.app.config.set("announcer.home_voice", "recorded")
 
         dialog = GoalDialog(self.app)
         dialog.scorer.set("7")
@@ -435,11 +436,31 @@ class TestDialogs(UITestCase):
         from hockeymusic.ui.dialogs import SettingsDialog
 
         dialog = SettingsDialog(self.app)
-        self.assertEqual(dialog.home_voice.get(), "recorded")
-        dialog.home_voice.set("hume")
-        dialog._save()
-        self.assertEqual(self.app.config.get("announcer.home_voice"), "hume")
+        self.assertEqual(dialog.home_voice.get(), "hume")
         self.assertFalse(self.app.announcer.use_recorded)
+        dialog.home_voice.set("recorded")
+        dialog._save()
+        self.assertEqual(self.app.config.get("announcer.home_voice"), "recorded")
+        self.assertTrue(self.app.announcer.use_recorded)
+
+    def test_goal_panel_docks_and_leaves_music_controls_live(self):
+        from hockeymusic.roster import Player
+
+        self.app.roster.players["7"] = Player("7", "Alexander Mellen")
+        panel = self.app.open_goal_panel()
+        self.pump()
+        self.assertTrue(panel.win.winfo_ismapped())
+        self.assertIsNone(self.root.grab_current())       # nothing locks the console
+        self.assertIs(self.app.open_goal_panel(), panel)  # a second press reuses it
+
+        self.app.play_from_top()                          # music works while it's open
+        self.assertTrue(self.app.music.playing)
+
+        panel.scorer.set("7")
+        panel.announce()
+        self.assertIsNone(self.app.goal_panel)
+        self.assertFalse(panel.win.winfo_exists())
+        self.assertEqual(len(self.announced), 1)
 
     def test_goal_dialog_quick_pick_advances_fields(self):
         from hockeymusic.roster import Player

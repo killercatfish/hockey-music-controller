@@ -248,7 +248,7 @@ class SettingsDialog:
         # disk; this only picks which one plays. Missing pieces fall back to Hume.
         ttk.Separator(tab, orient="horizontal").grid(row=13, column=0, columnspan=2,
                                                      sticky="ew", pady=14)
-        self.home_voice = tk.StringVar(value=cfg.get("announcer.home_voice", "recorded"))
+        self.home_voice = tk.StringVar(value=cfg.get("announcer.home_voice", "hume"))
         voice_row = ttk.Frame(tab)
         voice_row.grid(row=14, column=0, columnspan=2, sticky=tk.W)
         ttk.Label(voice_row, text="Home goals + lineup voice:").pack(side=tk.LEFT)

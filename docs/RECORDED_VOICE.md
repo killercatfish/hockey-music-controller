@@ -8,11 +8,12 @@ now play in Josh's own recorded voice, joined from 40 short clips recorded on
 
 **Settings → Announcer → "Home goals + lineup voice"** has two choices:
 
-- **My recordings** (the default): the call is joined from your clips. If a
+- **My recordings**: the call is joined from your clips. If a
   clip is missing (for example a new player, or a renamed one), that call
   falls back to Hume, the same way it did before.
-- **Hume**: the Hume cache, unchanged. Nothing was deleted, so switching back
-  is instant.
+- **Hume** (the default since 2026-10-17): the Hume cache, unchanged. Nothing
+  was deleted, so switching back is instant. Josh switched back because the
+  joined car takes sounded off; he'll re-record on a new mic.
 
 The goal dialog shows **🎙 Your voice — plays offline** when a call will use
 your recordings.

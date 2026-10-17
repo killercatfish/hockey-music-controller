@@ -4,16 +4,21 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 from .. import announcements, paths
-from .common import modal, center, preview_box
+from .common import preview_box
 
 
 class GoalDialog:
-    """Announce a goal: pick the scorer, pick assists, hear their song."""
+    """Announce a goal: pick the scorer, pick assists, hear their song.
 
-    def __init__(self, app):
+    A panel docked on the right of the console, not a modal window: the music
+    controls stay live while the call is being built. `win` is the panel frame.
+    """
+
+    def __init__(self, app, on_close=None):
         self.app = app
         self.roster = app.roster
-        self.win = modal(app.root, "Goal Announcement", "640x680")
+        self.on_close = on_close
+        self.win = ttk.Frame(app.root, relief=tk.GROOVE, borderwidth=2)
 
         self.team = tk.StringVar(value="home")
         self.scorer = tk.StringVar()
@@ -28,12 +33,11 @@ class GoalDialog:
         for var in (self.team, self.scorer, self.assist1, self.assist2):
             var.trace_add("write", lambda *_: self._refresh())
         self._refresh()
-        center(self.win)
 
     # -- layout -----------------------------------------------------------
 
     def _build(self):
-        frame = ttk.Frame(self.win, padding=16)
+        frame = ttk.Frame(self.win, padding=12)
         frame.pack(fill=tk.BOTH, expand=True)
 
         ttk.Label(frame, text="📢 Goal Announcement",
@@ -65,6 +69,7 @@ class GoalDialog:
             entry.grid(row=row, column=1, padx=8, pady=4)
             entry.bind("<Return>", lambda e: self.announce())
             if key == "scorer":
+                self.scorer_entry = entry
                 entry.focus_set()
             name = ttk.Label(grid, text="", font=("Arial", 12, "bold"),
                              foreground="#0a6")
@@ -82,7 +87,7 @@ class GoalDialog:
 
         ttk.Label(frame, text="The crowd will hear:",
                   font=("Arial", 11, "bold")).pack(anchor="w", pady=(12, 4))
-        self.preview = preview_box(frame, width=580)
+        self.preview = preview_box(frame, width=400)
         self.preview.pack(fill=tk.X)
         self.cache_label = ttk.Label(frame, text="", font=("Arial", 9, "italic"))
         self.cache_label.pack(anchor="w", pady=(4, 0))
@@ -92,8 +97,8 @@ class GoalDialog:
         tk.Button(buttons, text="🎤 ANNOUNCE GOAL", command=self.announce,
                   font=("Arial", 15, "bold"), bg="#FF6B6B", fg="#111111",
                   height=2).pack(side=tk.LEFT, expand=True, fill=tk.X)
-        ttk.Button(buttons, text="Cancel",
-                   command=self.win.destroy).pack(side=tk.LEFT, padx=(8, 0))
+        ttk.Button(buttons, text="Close",
+                   command=self.close).pack(side=tk.LEFT, padx=(8, 0))
 
     def _build_quick_pick(self, parent):
         """A grid of jersey numbers -- faster and less error-prone than typing."""
@@ -102,7 +107,7 @@ class GoalDialog:
         box = ttk.LabelFrame(parent, text="Tap a number (fills the selected field)",
                              padding=6)
         box.pack(fill=tk.X, pady=(10, 0))
-        columns = 9
+        columns = 8
         for i, player in enumerate(self.roster.sorted_players()):
             btn = tk.Button(
                 box, text=player.number, width=4,
@@ -221,7 +226,15 @@ class GoalDialog:
 
         self.app.announce(self._text(), celebration=celebration, pieces=self._pieces(),
                           recorded=self._recorded())
+        self.close()
+
+    def focus(self):
+        self.scorer_entry.focus_set()
+
+    def close(self):
         self.win.destroy()
+        if self.on_close:
+            self.on_close()
 
 
 def _tooltip(widget, text):

@@ -223,7 +223,7 @@ class Announcer:
     @property
     def use_recorded(self):
         """Home calls in Josh's recorded voice (Settings). Off = Hume, as before."""
-        return self.config.get("announcer.home_voice", "recorded") == "recorded"
+        return self.config.get("announcer.home_voice", "hume") == "recorded"
 
     def recorded_ready(self, lines):
         return bool(lines) and self.use_recorded and self.voice.has_all(lines)

@@ -25,7 +25,7 @@ bash launch.sh                    # checks deps, opens Music, launches
 python3 hockey_music_controller.py
 
 python3 tests/test_core.py        # 51 tests: copy, roster, playlists, migration, clip sharing, recorded voice
-python3 tests/test_ui_smoke.py    # 27 tests: builds every window
+python3 tests/test_ui_smoke.py    # 28 tests: builds every window
 python3 tests/test_hype.py        # 20 tests: chorus detection, proposal apply, game-deck split
 
 python3 hype_points.py propose|show|apply|revert   # clip starts at the chorus (docs/HYPE_POINTS.md)
@@ -174,7 +174,10 @@ before were bulk genre defaults (5/8/10/12s), not hand-tuned — that's why
 
 **Recorded voice (2026-10-15).** Home goals and the lineup play in Josh's own
 voice, joined from 40 clips he recorded (docs/RECORDED_VOICE.md). Settings
-switches home calls back to Hume; the Hume cache was not touched. Clip keys are
+switches home calls back to Hume; the Hume cache was not touched.
+**Since 2026-10-17 Hume is the default again** (Josh: the joined takes sounded
+off; he re-records everything on a new mic). The goal call is now a panel docked
+on the right of the console, not a modal, so music stays controllable. Clip keys are
 the exact strings from `home_goal_pieces()`, so a wording change in
 `player_called()` orphans every recording, the same way it would re-key the
 Hume cache.

@@ -239,8 +239,14 @@ class AppleMusicController:
                 self._fading = False
 
     def play_playlist(self, playlist_name):
-        """Play a whole user playlist from its first track (Zamboni set etc)."""
-        return self._run(f'tell application "Music" to play user playlist '
+        """Play a whole user playlist from its first track (Zamboni set etc).
+
+        `play user playlist` starts on a random track when Music's shuffle is
+        on, so the Zamboni button could open on anything. Naming track 1 makes
+        the first song play first regardless; Music's shuffle setting is left
+        alone and still applies to what follows.
+        """
+        return self._run(f'tell application "Music" to play track 1 of user playlist '
                          f'"{_escape(playlist_name)}"')[1]
 
     def play_song_or_playlist(self, name):

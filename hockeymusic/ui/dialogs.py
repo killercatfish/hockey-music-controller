@@ -5,6 +5,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 from .. import announcements, paths
+from ..announcer import HUME_SHUTDOWN
 from ..config import EVENT_KEYS
 from ..playlists import format_seconds, parse_time
 from .common import modal, center, preview_box
@@ -241,8 +242,10 @@ class SettingsDialog:
         self.cache_label = ttk.Label(
             tab, text=f"Cache: {count} lines, {size / 1_000_000:.1f} MB")
         self.cache_label.grid(row=6, column=0, sticky=tk.W)
-        ttk.Button(tab, text="Clear cache", command=self._clear_cache
-                   ).grid(row=6, column=1, sticky=tk.W, padx=8)
+        # After Hume shuts down the cache can't be rebuilt, so there's no button.
+        if not announcer.hume_retired:
+            ttk.Button(tab, text="Clear cache", command=self._clear_cache
+                       ).grid(row=6, column=1, sticky=tk.W, padx=8)
 
         # Home calls: Josh's recorded pieces, or the Hume cache. Both stay on
         # disk; this only picks which one plays. Missing pieces fall back to Hume.
@@ -260,6 +263,13 @@ class SettingsDialog:
         return tab
 
     def _clear_cache(self):
+        if not messagebox.askyesno(
+                "Clear cache",
+                "Delete every cached announcement?\n\n"
+                f"Hume shuts down {HUME_SHUTDOWN:%B %-d}. After that, "
+                "deleted lines can never be made again in this voice.",
+                icon="warning", parent=self.win):
+            return
         removed = self.app.announcer.clear_cache()
         self.cache_label.config(text=f"Cache: 0 lines (removed {removed})")
 
@@ -354,6 +364,12 @@ class PrerenderDialog:
     def _start(self):
         if self._running:
             self._stop = True
+            return
+        if self.app.announcer.hume_retired:
+            messagebox.showwarning(
+                "Hume shut down",
+                f"Hume's voice API shut down on {HUME_SHUTDOWN:%B %-d, %Y}. "
+                "Only lines already cached can play.", parent=self.win)
             return
         if not self.app.announcer.hume_available:
             messagebox.showwarning(

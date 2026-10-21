@@ -491,6 +491,29 @@ class TestDialogs(UITestCase):
             self.pump()
             dialog.win.destroy()
 
+    def test_settings_has_no_clear_cache_after_hume_shutdown(self):
+        from hockeymusic.announcer import Announcer
+        from hockeymusic.ui.dialogs import SettingsDialog
+
+        def buttons(widget):
+            for child in widget.winfo_children():
+                if child.winfo_class() in ("TButton", "Button"):
+                    yield child.cget("text")
+                yield from buttons(child)
+
+        dialog = SettingsDialog(self.app)
+        self.assertIn("Clear cache", list(buttons(dialog.win)))
+        dialog.win.destroy()
+
+        original = Announcer.__dict__["hume_retired"]
+        Announcer.hume_retired = property(lambda self: True)
+        try:
+            dialog = SettingsDialog(self.app)
+            self.assertNotIn("Clear cache", list(buttons(dialog.win)))
+            dialog.win.destroy()
+        finally:
+            Announcer.hume_retired = original
+
     def test_settings_save_round_trips(self):
         from hockeymusic.ui.dialogs import SettingsDialog
 

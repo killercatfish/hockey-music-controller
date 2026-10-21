@@ -302,6 +302,65 @@ class TestAnnouncerQuota(unittest.TestCase):
         self.assertEqual((rendered, skipped, failed), (0, 0, 50))
 
 
+class TestHumeShutdown(unittest.TestCase):
+    """After Hume shuts down (2026-11-13) the cache is the only copy of the voice."""
+
+    def setUp(self):
+        from hockeymusic import announcer as mod
+        self.mod = mod
+        self.tmp = tempfile.TemporaryDirectory()
+        self._cache_dir = mod.paths.TTS_CACHE_DIR
+        mod.paths.TTS_CACHE_DIR = Path(self.tmp.name)
+        self.a = mod.Announcer(Config({}))
+        self.line = "Goal scored by number 7"
+        self.a.cache_path(self.line).write_bytes(b"audio")
+
+    def tearDown(self):
+        self.mod.paths.TTS_CACHE_DIR = self._cache_dir
+        self.tmp.cleanup()
+
+    def _patch(self, name, value):
+        cls = type(self.a)
+        original = cls.__dict__[name]
+        setattr(cls, name, property(lambda self: value))
+        self.addCleanup(setattr, cls, name, original)
+
+    def _retire(self, retired=True):
+        self._patch("hume_retired", retired)
+
+    def test_shutdown_date(self):
+        import datetime
+        self.assertFalse(self.mod.hume_retired(datetime.date(2026, 11, 12)))
+        self.assertTrue(self.mod.hume_retired(datetime.date(2026, 11, 13)))
+
+    def test_clear_cache_refused_after_shutdown(self):
+        self._retire()
+        self.assertEqual(self.a.clear_cache(), 0)
+        self.assertTrue(self.a.is_cached(self.line))
+        self.assertFalse(self.a.hume_available)
+        self.assertIn("cached lines only", self.a.status_text)
+
+    def test_clear_cache_still_works_before_shutdown(self):
+        self._retire(False)
+        self.assertEqual(self.a.clear_cache(), 1)
+
+    def test_forced_render_falls_back_to_the_cached_line(self):
+        # "Use cached audio" off forces a re-render; with Hume gone (or no
+        # wifi) the cached line must still play, not nothing.
+        self._retire()
+        self.a._synthesize = lambda text: self.fail("called a dead API")
+        self.assertEqual(self.a.render(self.line, force=True),
+                         self.a.cache_path(self.line))
+        self.assertIsNone(self.a.render("never cached", force=True))
+
+    def test_failed_rerender_keeps_the_cached_line(self):
+        self._retire(False)
+        self._patch("can_render", True)
+        self.a._synthesize = lambda text: None
+        self.assertEqual(self.a.render(self.line, force=True),
+                         self.a.cache_path(self.line))
+
+
 class TestAnnouncerStopsMusic(unittest.TestCase):
     class Music:
         def __init__(self): self.calls = []; self.playing = True

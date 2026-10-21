@@ -12,6 +12,7 @@ Three problems with the original implementation, all fixed here:
 
 import array
 import base64
+import datetime
 import hashlib
 import os
 import queue
@@ -26,6 +27,14 @@ from . import paths
 from .voice import RecordedVoice
 
 QUOTA_BACKOFF = 10 * 60      # seconds to skip Hume after a 429
+
+# Hume's TTS API shuts down at 12:01am EST on this date. After it, the disk
+# cache is the only copy of that voice: nothing can re-render a lost line.
+HUME_SHUTDOWN = datetime.date(2026, 11, 13)
+
+
+def hume_retired(today=None):
+    return (today or datetime.date.today()) >= HUME_SHUTDOWN
 
 # Stitching: announcement + celebration clip become one file so the "WOO"
 # lands right on the end of the call instead of a second afplay later.
@@ -191,7 +200,13 @@ class Announcer:
     # -- capability -------------------------------------------------------
 
     @property
+    def hume_retired(self):
+        return hume_retired()
+
+    @property
     def hume_available(self):
+        if self.hume_retired:
+            return False                 # don't wait on a dead API at the rink
         return bool(HUME_SDK and HUME_API_KEY and self.voice_id)
 
     @property
@@ -210,6 +225,8 @@ class Announcer:
 
     @property
     def status_text(self):
+        if self.hume_retired:
+            return f"Hume shut down {HUME_SHUTDOWN:%Y-%m-%d}: cached lines only"
         if self.hume_available and self.quota_exhausted:
             return "macOS voice (Hume quota exhausted -- check your Hume plan)"
         if self.hume_available:
@@ -245,6 +262,10 @@ class Announcer:
         return len(files), sum(f.stat().st_size for f in files)
 
     def clear_cache(self):
+        """Delete every cached Hume line. Refused once Hume is gone: the
+        cache can't be rebuilt then, so a click would lose that voice for good."""
+        if self.hume_retired:
+            return 0
         removed = 0
         for f in paths.TTS_CACHE_DIR.glob("*.wav"):
             try:
@@ -263,14 +284,17 @@ class Announcer:
         from the tkinter main loop. Returns None if Hume is unreachable.
         """
         path = self.cache_path(text)
-        if path.exists() and path.stat().st_size > 0 and not force:
-            return path
-        if not self.hume_available or self.quota_exhausted:
-            return None
+        cached = path if self.is_cached(text) else None
+        if cached and not force:
+            return cached
+        # A forced re-render that can't happen (no wifi, quota, Hume gone)
+        # still plays the cached line rather than nothing.
+        if not self.can_render:
+            return cached
 
         audio = self._synthesize(text)
         if audio is None:
-            return None
+            return cached
         try:
             tmp = path.with_suffix(".part")
             tmp.write_bytes(audio)

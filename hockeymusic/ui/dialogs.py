@@ -327,7 +327,9 @@ class PrerenderDialog:
         for value, label in (("lineup", "Starting lineup only"),
                              ("basic", "Lineup + every unassisted goal call"),
                              ("full", "Everything, including each single-assist call"),
-                             ("away", "Away goal pieces: any number, any assists (~206 short lines)")):
+                             ("away", "Away goal pieces: any number, any assists (~206 short lines)"),
+                             ("home_pieces", "Home goal pieces: two-assist calls and numbers "
+                                             "not on the roster (~240 short lines)")):
             ttk.Radiobutton(frame, text=label, variable=self.scope, value=value,
                             command=self._refresh).pack(anchor="w", pady=2)
 

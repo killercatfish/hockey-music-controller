@@ -79,8 +79,10 @@ def away_piece_manifest():
 
 def player_called(number, name, last=True):
     """A player as a recorded piece: 'Number 7, Alexander Mellen!' to land a
-    sentence, 'number 7, Alexander Mellen' (voice rising) when more follows."""
-    return f"Number {number}, {name}!" if last else f"number {number}, {name}"
+    sentence, 'number 7, Alexander Mellen' (voice rising) when more follows.
+    No name (not on the roster): just 'Number 23!' / 'number 23'."""
+    who = f"{number}, {name}" if name else f"{number}"
+    return f"Number {who}!" if last else f"number {who}"
 
 
 def home_goal_pieces(scorer, assists=(), roster=None, team_name="Patriots"):
@@ -88,13 +90,14 @@ def home_goal_pieces(scorer, assists=(), roster=None, team_name="Patriots"):
 
     Each rostered player is recorded twice (landing and rising), plus a few
     phrases. Read together they say what goal("home", ...) says; the test holds
-    them to it. Returns None if any number isn't on the roster -- there's no
-    recording of a name we don't have.
+    them to it. A number not on the roster is called by number alone, the same
+    as goal() does; only the Hume pieces cover those (hume_home_piece_manifest).
+    Returns None if a number isn't a jersey number at all.
     """
     numbers = [str(scorer).strip().lstrip("#")]
     numbers += [str(a).strip().lstrip("#") for a in assists if a and str(a).strip()]
     names = [roster.display_name(n) if roster else None for n in numbers]
-    if not all(names):
+    if any(not name and n not in AWAY_NUMBERS for n, name in zip(numbers, names)):
         return None
     called = list(zip(numbers, names))[:3]
     pieces = [f"{team_name} GOAL!!", "Scored by", player_called(*called[0])]
@@ -113,6 +116,19 @@ def home_piece_manifest(roster, team_name="Patriots"):
     for p in roster.sorted_players():
         items += [player_called(p.number, p.display_name),
                   player_called(p.number, p.display_name, last=False)]
+    return items
+
+
+def hume_home_piece_manifest(roster, team_name="Patriots"):
+    """(cache_key, text) for the home goal call in Hume pieces: the recorded
+    voice's lines plus every jersey number on its own. Joined at the rink, they
+    cover the two-assist calls (too many to render whole) and a player who
+    isn't on the roster yet."""
+    items = [(f"home_piece_{i}", t)
+             for i, t in enumerate(home_piece_manifest(roster, team_name))]
+    for n in AWAY_NUMBERS:
+        items += [(f"home_end_{n}", player_called(n, None)),
+                  (f"home_mid_{n}", player_called(n, None, last=False))]
     return items
 
 
@@ -151,6 +167,7 @@ PRERENDER_SCOPES = {
     "basic": "Lineup + every unassisted goal call",
     "full": "Lineup + goal calls with each single assist",
     "away": "Away goal pieces (any number, any assists)",
+    "home_pieces": "Home goal pieces (two-assist calls, numbers not on the roster)",
 }
 
 
@@ -164,12 +181,15 @@ def prerender_manifest(roster, team_name="Patriots", scope="basic"):
       basic  -- N+1 lineup, plus N unassisted goal calls
       full   -- adds N*(N-1) single-assist calls (the common case in a game)
       away   -- the ~206 away-goal pieces; no roster needed
+      home_pieces -- ~240 home pieces, joined for any call not cached whole
 
     Anything not cached still synthesises live, so a smaller scope only costs
     you latency on the rarer calls.
     """
     if scope == "away":
         return away_piece_manifest()
+    if scope == "home_pieces":
+        return hume_home_piece_manifest(roster, team_name)
     items = list(lineup_sequence(roster, team_name))
     if scope == "lineup":
         return items

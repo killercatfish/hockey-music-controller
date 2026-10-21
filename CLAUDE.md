@@ -24,7 +24,7 @@ tkinter, Apple Music must be running. Currently developed on Python 3.14.
 bash launch.sh                    # checks deps, opens Music, launches
 python3 hockey_music_controller.py
 
-python3 tests/test_core.py        # 56 tests: copy, roster, playlists, migration, clip sharing, recorded voice, Hume shutdown
+python3 tests/test_core.py        # 57 tests: copy, roster, playlists, migration, clip sharing, recorded voice, Hume shutdown
 python3 tests/test_ui_smoke.py    # 29 tests: builds every window
 python3 tests/test_hype.py        # 20 tests: chorus detection, proposal apply, game-deck split
 

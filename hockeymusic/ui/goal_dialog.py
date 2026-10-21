@@ -184,10 +184,12 @@ class GoalDialog:
         )
 
     def _pieces(self):
-        """Away goals only: the cached pieces that can stand in for the full line."""
+        """The cached Hume pieces that can stand in for the full line."""
         scorer = self.scorer.get().strip()
-        if self.team.get() != "away" or not scorer:
+        if not scorer:
             return None
+        if self.team.get() == "home":
+            return self._recorded()     # same lines; the Hume cache holds them too
         return announcements.away_goal_pieces(
             scorer, [self.assist1.get().strip(), self.assist2.get().strip()])
 

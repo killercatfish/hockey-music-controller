@@ -79,15 +79,31 @@ class TestAnnouncements(unittest.TestCase):
         import re
         words = lambda t: re.sub(r"[^a-z0-9 ]", "", t.lower()).split()
         r = demo_roster()
-        for scorer, assists in (("7", []), ("7", ["5"]), ("7", ["5", "10"])):
+        hume = {t for _, t in announcements.hume_home_piece_manifest(r)}
+        for scorer, assists in (("7", []), ("7", ["5"]), ("7", ["5", "10"]),
+                                ("99", ["5", "00"])):
             pieces = announcements.home_goal_pieces(scorer, assists, r)
             self.assertEqual(words(" ".join(pieces)),
                              words(announcements.goal("home", scorer, assists, r)))
-            self.assertLessEqual(set(pieces), set(announcements.home_piece_manifest(r)))
+            self.assertLessEqual(set(pieces), hume)
+            if scorer == "7":
+                self.assertLessEqual(set(pieces),
+                                     set(announcements.home_piece_manifest(r)))
 
-    def test_home_pieces_need_every_number_on_the_roster(self):
-        self.assertIsNone(announcements.home_goal_pieces("99", [], demo_roster()))
-        self.assertIsNone(announcements.home_goal_pieces("7", ["99"], demo_roster()))
+    def test_home_pieces_call_an_unrostered_number_by_number(self):
+        r = demo_roster()
+        self.assertIn("Number 99!", announcements.home_goal_pieces("99", [], r))
+        self.assertIn("number 99", announcements.home_goal_pieces("7", ["99", "5"], r))
+        self.assertIsNone(announcements.home_goal_pieces("100", [], r))
+        self.assertIsNone(announcements.home_goal_pieces("7", ["A"], r))
+
+    def test_hume_home_pieces_are_in_the_prerender_scope(self):
+        r = demo_roster()
+        manifest = announcements.prerender_manifest(r, scope="home_pieces")
+        texts = [t for _, t in manifest]
+        self.assertEqual(len(set(texts)), len(texts))
+        self.assertEqual(len(manifest),
+                         len(announcements.home_piece_manifest(r)) + 2 * 101)
 
     def test_lineup_line_is_the_recorded_landing_piece(self):
         # The lineup reuses each player's "Number 7, Name!" recording; that only

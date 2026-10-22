@@ -234,7 +234,8 @@ class Announcer:
         if not HUME_SDK:
             return "macOS voice (Hume SDK not installed)"
         if not HUME_API_KEY:
-            return "macOS voice (no HUME_API_KEY in .env)"
+            # Josh cancelled Hume 2026-10-22; the cache still plays.
+            return "Hume voice: cached lines only (no API key)"
         return "macOS voice"
 
     @property

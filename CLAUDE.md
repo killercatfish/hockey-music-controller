@@ -127,9 +127,10 @@ project directory.
 **7. Secrets never enter the repo.**
 `.env` was committed to the public GitHub repo. Local history was purged with
 `git filter-repo` on 2026-08-01 but the purge was NOT pushed until 2026-09-26;
-the live Hume key and Spotify secret sat public until then. **Key rotation is
-still owed** (Hume + Spotify) as of 2026-09-26 -- the audio cache is keyed on
-voice + text, so rotating costs no re-render. `.gitignore` does not untrack an
+the live Hume key and Spotify secret sat public until then. **Closed
+2026-10-22:** Josh cancelled the Hume plan and deleted the account, and deleted
+the Spotify developer app (nothing in the code used Spotify). `.env` now holds
+only `HUME_VOICE_ID`, which the cache key needs -- don't remove it. `.gitignore` does not untrack an
 already-committed file. `create_native_app.sh` deliberately does not bundle `.env`.
 
 ---
@@ -198,6 +199,10 @@ playlists.py), every track once before a repeat, never the same one twice runnin
 Other events still play a named playlist from track 1 (the Zamboni set needs that).
 Josh uses only these two situational buttons; he declined a wider set of
 one-tap situational cues (Pink Panther, Jeopardy, etc.) as too much to manage.
+
+**Hume cancelled (2026-10-22).** Josh cancelled the plan and deleted the Hume
+account. Every pre-render set was fully cached first (lineup, home pieces, away,
+full = 0 missing). No new lines can be made in that voice.
 
 **Hume shutdown guard (2026-10-21).** From `announcer.HUME_SHUTDOWN`
 (2026-11-13) on, the app never calls Hume, `clear_cache()` refuses, Settings

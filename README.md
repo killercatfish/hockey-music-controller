@@ -46,6 +46,9 @@ and gives every kid on the roster their own goal song.
   lyrics and starts the clip there, so a stoppage opens on the hook, not the intro.
 - **One playlist per game** — `game_playlists.py` deals the master playlist into
   disjoint decks for a doubleheader; clip points carry over.
+- **Power Play / Penalty Kill rotate** — point either button at a playlist in
+  Settings and each press plays a different song from it, every song once before
+  any repeats. (Other event buttons play a named playlist from the top.)
 - **Fades instead of hard cuts** on every stop and skip.
 - **No-repeat shuffle** — keeps the last dozen tracks out of the front of the deck.
 - **Search/filter** the playlist without losing your place.

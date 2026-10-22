@@ -228,3 +228,26 @@ class PoolSet:
     def save_into_config(self):
         self.config.set("pools", {n: p.to_dict() for n, p in self.pools.items()})
         self.config.set("active_pool", self.active_name)
+
+
+class EventDeck:
+    """Deals tracks 1..size of an event playlist (Power Play, Penalty Kill) in
+    shuffled order, so a button pressed five times a game doesn't play the same
+    song five times. Every track plays once before any repeats, and a reshuffle
+    never opens on the track that just played."""
+
+    def __init__(self, playlist, size, rng=None):
+        self.playlist = playlist
+        self.size = size
+        self._rng = rng or random.Random()
+        self._order = []
+        self.last = None
+
+    def next(self):
+        if not self._order:
+            self._order = list(range(1, self.size + 1))
+            self._rng.shuffle(self._order)
+            if self.size > 1 and self._order[0] == self.last:
+                self._order.append(self._order.pop(0))
+        self.last = self._order.pop(0)
+        return self.last

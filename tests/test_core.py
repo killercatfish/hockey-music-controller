@@ -10,7 +10,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from hockeymusic import announcements
 from hockeymusic.config import Config, migrate
-from hockeymusic.playlists import Clip, Pool, PoolSet, format_seconds, parse_time
+import random
+
+from hockeymusic.playlists import Clip, EventDeck, Pool, PoolSet, format_seconds, parse_time
 from hockeymusic.roster import Player, Roster
 
 
@@ -221,6 +223,19 @@ class TestPlaylists(unittest.TestCase):
         self.assertFalse(pools.remove(pools.active_name))
         pools.add("Warmup")
         self.assertTrue(pools.remove("Warmup"))
+
+
+class TestEventDeck(unittest.TestCase):
+    def test_every_track_before_a_repeat_and_never_twice_running(self):
+        deck = EventDeck("PP", 4, rng=random.Random(3))
+        dealt = [deck.next() for _ in range(40)]
+        for i in range(0, 40, 4):
+            self.assertEqual(sorted(dealt[i:i + 4]), [1, 2, 3, 4])
+        self.assertTrue(all(a != b for a, b in zip(dealt, dealt[1:])))
+
+    def test_single_track_playlist(self):
+        deck = EventDeck("PP", 1)
+        self.assertEqual([deck.next() for _ in range(3)], [1, 1, 1])
 
 
 class TestConfigMigration(unittest.TestCase):

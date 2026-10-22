@@ -7,7 +7,7 @@ from .. import announcements, paths
 from ..announcer import Announcer
 from ..config import Config, EVENT_KEYS
 from ..music import AppleMusicController
-from ..playlists import PoolSet, format_seconds
+from ..playlists import EventDeck, PoolSet, format_seconds
 from ..roster import Roster
 from . import common
 from .dialogs import ClipDialog, FinalScoreDialog, PrerenderDialog, SettingsDialog
@@ -15,6 +15,8 @@ from .goal_dialog import GoalDialog
 from .roster_editor import RosterEditor
 
 TICK_MS = 700
+# Events whose playlist rotates a song per press instead of playing from the top.
+ROTATING_EVENTS = ("power_play", "penalty_kill")
 
 
 class HockeyMusicApp:
@@ -47,6 +49,7 @@ class HockeyMusicApp:
         self.pool_var = tk.StringVar(value=self.pools.active_name)
         self.volume_var = tk.IntVar(value=100)
         self._stop_token = 0
+        self._event_decks = {}       # event key -> EventDeck, for ROTATING_EVENTS
 
         self._build()
         self._bind_shortcuts()
@@ -655,11 +658,25 @@ class HockeyMusicApp:
         self._stop_token += 1           # cancel any pending fade backstop
         self.music.cancel_fades()
         self.music.set_volume(self.music.base_volume)
-        if self.music.play_song_or_playlist(song):
+        if key in ROTATING_EVENTS and self.music.playlist_exists(song):
+            played = self._play_rotating(key, song)
+        else:
+            played = self.music.play_song_or_playlist(song)
+        if played:
             self.status_var.set(f"{label}: {song}")
         else:
             messagebox.showerror("Error", f"Could not play “{song}”. "
                                           "Check the exact title in Apple Music.")
+
+    def _play_rotating(self, key, playlist):
+        """Play the next song from this event's shuffled deck of `playlist`."""
+        size = self.music.playlist_track_count(playlist)
+        if not size:
+            return False
+        deck = self._event_decks.get(key)
+        if not deck or deck.playlist != playlist or deck.size != size:
+            deck = self._event_decks[key] = EventDeck(playlist, size)
+        return self.music.play_playlist(playlist, track=deck.next())
 
     def play_goal_song(self, player=None):
         """Play the scorer's own goal song, falling back to the team's."""

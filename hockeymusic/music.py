@@ -238,15 +238,21 @@ class AppleMusicController:
             with self._vol_lock:
                 self._fading = False
 
-    def play_playlist(self, playlist_name):
+    def playlist_track_count(self, playlist_name):
+        out, ok = self._run(
+            f'tell application "Music" to return count tracks of user playlist "{_escape(playlist_name)}"')
+        return int(out) if ok and out.isdigit() else 0
+
+    def play_playlist(self, playlist_name, track=1):
         """Play a whole user playlist from its first track (Zamboni set etc).
 
         `play user playlist` starts on a random track when Music's shuffle is
         on, so the Zamboni button could open on anything. Naming track 1 makes
         the first song play first regardless; Music's shuffle setting is left
-        alone and still applies to what follows.
+        alone and still applies to what follows. `track` picks another start
+        (the Power Play / Penalty Kill rotation).
         """
-        return self._run(f'tell application "Music" to play track 1 of user playlist '
+        return self._run(f'tell application "Music" to play track {int(track)} of user playlist '
                          f'"{_escape(playlist_name)}"')[1]
 
     def play_song_or_playlist(self, name):

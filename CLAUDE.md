@@ -24,8 +24,8 @@ tkinter, Apple Music must be running. Currently developed on Python 3.14.
 bash launch.sh                    # checks deps, opens Music, launches
 python3 hockey_music_controller.py
 
-python3 tests/test_core.py        # 57 tests: copy, roster, playlists, migration, clip sharing, recorded voice, Hume shutdown
-python3 tests/test_ui_smoke.py    # 29 tests: builds every window
+python3 tests/test_core.py        # 59 tests: copy, roster, playlists, event rotation, migration, clip sharing, recorded voice, Hume shutdown
+python3 tests/test_ui_smoke.py    # 30 tests: builds every window
 python3 tests/test_hype.py        # 20 tests: chorus detection, proposal apply, game-deck split
 
 python3 hype_points.py propose|show|apply|revert   # clip starts at the chorus (docs/HYPE_POINTS.md)
@@ -191,6 +191,13 @@ mid pre-render. The "Everything" scope is ~300 lines; "Lineup + unassisted" is
 ~35 and had already rendered. `Announcer` now backs off Hume for 10 minutes
 after a 429 (uncached lines fall straight to the macOS voice) and pre-render
 stops on the first one. Check the plan at platform.hume.ai before a big render.
+
+**Power Play / Penalty Kill rotate (2026-10-22).** When either event names a
+playlist, each press plays the next track of a shuffled deck (`EventDeck` in
+playlists.py), every track once before a repeat, never the same one twice running.
+Other events still play a named playlist from track 1 (the Zamboni set needs that).
+Josh uses only these two situational buttons; he declined a wider set of
+one-tap situational cues (Pink Panther, Jeopardy, etc.) as too much to manage.
 
 **Hume shutdown guard (2026-10-21).** From `announcer.HUME_SHUTDOWN`
 (2026-11-13) on, the app never calls Hume, `clear_cache()` refuses, Settings

@@ -30,8 +30,11 @@ class FakeMusic:
     def playlist_exists(self, name):
         return name in self.get_playlists()
 
-    def play_playlist(self, name):
-        self.played.append(("playlist", name))
+    def playlist_track_count(self, name):
+        return 5 if self.playlist_exists(name) else 0
+
+    def play_playlist(self, name, track=1):
+        self.played.append(("playlist", name, track))
         self.playing = True
         return True
 
@@ -242,9 +245,20 @@ class TestMainWindow(UITestCase):
         app = self.app
         app.config.set_event_song("zamboni", "Warmups")
         app.play_event("zamboni", "Zamboni")
-        self.assertEqual(app.music.played[-1], ("playlist", "Warmups"))
+        self.assertEqual(app.music.played[-1], ("playlist", "Warmups", 1))
         app.config.set_event_song("zamboni", "Some Track")
         app.play_event("zamboni", "Zamboni")
+        self.assertEqual(app.music.played[-1], ("Some Track", None))
+
+    def test_power_play_rotates_through_its_playlist(self):
+        app = self.app
+        app.config.set_event_song("power_play", "Warmups")
+        for _ in range(5):
+            app.play_event("power_play", "Power Play")
+        tracks = [p[2] for p in app.music.played[-5:]]
+        self.assertEqual(sorted(tracks), [1, 2, 3, 4, 5])
+        app.config.set_event_song("power_play", "Some Track")
+        app.play_event("power_play", "Power Play")
         self.assertEqual(app.music.played[-1], ("Some Track", None))
 
     def test_rows_show_track_length(self):

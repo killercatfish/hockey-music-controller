@@ -176,7 +176,8 @@ before were bulk genre defaults (5/8/10/12s), not hand-tuned — that's why
 **Recorded voice (2026-10-15).** Home goals and the lineup play in Josh's own
 voice, joined from 40 clips he recorded (docs/RECORDED_VOICE.md). Settings
 switches home calls back to Hume; the Hume cache was not touched.
-**Since 2026-10-17 Hume is the default again** (Josh: the joined takes sounded
+**Since 2026-10-17 the Hume cache is the default again** (the Hume account itself is gone since
+10/22; every line was cached first, Josh 10/24) (Josh: the joined takes sounded
 off; he re-records everything on a new mic). The goal call is now a panel docked
 on the right of the console, not a modal, so music stays controllable. Clip keys are
 the exact strings from `home_goal_pieces()`, so a wording change in

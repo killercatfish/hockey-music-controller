@@ -4,6 +4,10 @@ Hume's API shuts down on 2026-11-13. Home goal calls and the starting lineup
 now play in Josh's own recorded voice, joined from 40 short clips recorded on
 2026-10-15. Away goals still play from the Hume pieces.
 
+**"Hume" below means the cached audio, not the service.** Josh cancelled the Hume plan and deleted the
+account on 2026-10-22, after caching every voice line (Josh 10/24). The cache plays offline, but nothing new
+can be generated, so a call that isn't already cached needs a recording.
+
 ## What plays when
 
 **Settings → Announcer → "Home goals + lineup voice"** has two choices:
@@ -11,7 +15,7 @@ now play in Josh's own recorded voice, joined from 40 short clips recorded on
 - **My recordings**: the call is joined from your clips. If a
   clip is missing (for example a new player, or a renamed one), that call
   falls back to Hume, the same way it did before.
-- **Hume** (the default since 2026-10-17): the Hume cache, unchanged. Nothing
+- **Hume** (the default since 2026-10-17): the Hume cache, unchanged (the account is gone since 10/22). Nothing
   was deleted, so switching back is instant. Josh switched back because the
   joined car takes sounded off; he'll re-record on a new mic.
 

@@ -25,7 +25,7 @@ bash launch.sh                    # checks deps, opens Music, launches
 python3 hockey_music_controller.py
 
 python3 tests/test_core.py        # 59 tests: copy, roster, playlists, event rotation, migration, clip sharing, recorded voice, Hume shutdown
-python3 tests/test_ui_smoke.py    # 30 tests: builds every window
+python3 tests/test_ui_smoke.py    # 31 tests: builds every window
 python3 tests/test_hype.py        # 20 tests: chorus detection, proposal apply, game-deck split
 
 python3 hype_points.py propose|show|apply|revert   # clip starts at the chorus (docs/HYPE_POINTS.md)
@@ -200,6 +200,10 @@ playlists.py), every track once before a repeat, never the same one twice runnin
 Other events still play a named playlist from track 1 (the Zamboni set needs that).
 Josh uses only these two situational buttons; he declined a wider set of
 one-tap situational cues (Pink Panther, Jeopardy, etc.) as too much to manage.
+
+**Away Goal button (2026-11-02).** A third rotating event, `away_goal` (purple button, key V),
+plays the next track of a shuffled organ playlist and fades out at 30 seconds
+(`EVENT_MAX_SECONDS` in main_window.py). Josh asked for organ stings, max 30 s.
 
 **Hume cancelled (2026-10-22).** Josh cancelled the plan and deleted the Hume
 account. Every pre-render set was fully cached first (lineup, home pieces, away,

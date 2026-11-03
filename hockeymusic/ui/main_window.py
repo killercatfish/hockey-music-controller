@@ -7,7 +7,7 @@ from .. import announcements, paths
 from ..announcer import Announcer
 from ..config import Config, EVENT_KEYS
 from ..music import AppleMusicController
-from ..playlists import EventDeck, PoolSet, format_seconds
+from ..playlists import Clip, EventDeck, PoolSet, format_seconds
 from ..roster import Roster
 from . import common
 from .dialogs import ClipDialog, FinalScoreDialog, PrerenderDialog, SettingsDialog
@@ -16,7 +16,9 @@ from .roster_editor import RosterEditor
 
 TICK_MS = 700
 # Events whose playlist rotates a song per press instead of playing from the top.
-ROTATING_EVENTS = ("power_play", "penalty_kill")
+ROTATING_EVENTS = ("power_play", "penalty_kill", "away_goal")
+# Rotating events that stop on their own after this many seconds (the fade lands on it).
+EVENT_MAX_SECONDS = {"away_goal": 30}
 
 
 class HockeyMusicApp:
@@ -106,7 +108,7 @@ class HockeyMusicApp:
         row = ttk.Frame(parent)
         row.pack(fill=tk.X, pady=(8, 4))
         for key, label in EVENT_KEYS:
-            if key in ("goal", "power_play", "penalty_kill"):
+            if key in ("goal", "power_play", "penalty_kill", "away_goal"):
                 continue
             tk.Button(row, text=label, font=("Arial", 10),
                       bg=colours.get(key, "#DDDDDD"), relief=tk.RAISED, bd=3,
@@ -122,6 +124,10 @@ class HockeyMusicApp:
         tk.Button(situations, text="🛡️ Penalty Kill", bg="#4ECDC4", fg="#111111",
                   font=("Arial", 12, "bold"), relief=tk.RAISED, bd=4,
                   command=lambda: self.play_event("penalty_kill", "Penalty Kill")
+                  ).pack(side=tk.LEFT, padx=4, expand=True, fill=tk.X)
+        tk.Button(situations, text="🎹 Away Goal", bg="#C39BD3", fg="#111111",
+                  font=("Arial", 12, "bold"), relief=tk.RAISED, bd=4,
+                  command=lambda: self.play_event("away_goal", "Away Goal")
                   ).pack(side=tk.LEFT, padx=4, expand=True, fill=tk.X)
 
     def _build_pa_buttons(self, parent):
@@ -229,7 +235,7 @@ class HockeyMusicApp:
                   foreground="#0a6", wraplength=920).pack(anchor="w")
         ttk.Label(footer, font=("Arial", 9, "italic"), foreground="#555",
                   text="SPACE Play / Stop+queue next · ↑↓ Pick · ENTER Play · ESC Leave box · "
-                       "G Goal · N Next · S Stop · O Power play · P Penalty kill · "
+                       "G Goal · N Next · S Stop · O Power play · P Penalty kill · V Away goal · "
                        "A Announce goal · L Lineup"
                   ).pack(anchor="w")
 
@@ -244,6 +250,7 @@ class HockeyMusicApp:
             "s": self.stop,
             "o": lambda: self.play_event("power_play", "Power Play"),
             "p": lambda: self.play_event("penalty_kill", "Penalty Kill"),
+            "v": lambda: self.play_event("away_goal", "Away Goal"),
             "a": self.open_goal_panel,
             "l": self.announce_lineup,
         }
@@ -663,6 +670,9 @@ class HockeyMusicApp:
         else:
             played = self.music.play_song_or_playlist(song)
         if played:
+            limit = EVENT_MAX_SECONDS.get(key)
+            if limit:                   # _tick fades it out at the limit
+                self.active_clip = (song, Clip(start=0, end=limit))
             self.status_var.set(f"{label}: {song}")
         else:
             messagebox.showerror("Error", f"Could not play “{song}”. "

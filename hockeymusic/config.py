@@ -17,6 +17,7 @@ EVENT_KEYS = [
     ("end_of_game", "End of Game"),
     ("power_play", "Power Play"),
     ("penalty_kill", "Penalty Kill"),
+    ("away_goal", "Away Goal"),
 ]
 
 # Old flat keys -> new event keys. 'goal_song' was the odd one out.

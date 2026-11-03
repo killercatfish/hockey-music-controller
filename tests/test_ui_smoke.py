@@ -261,6 +261,19 @@ class TestMainWindow(UITestCase):
         app.play_event("power_play", "Power Play")
         self.assertEqual(app.music.played[-1], ("Some Track", None))
 
+    def test_away_goal_rotates_and_stops_at_30_seconds(self):
+        app = self.app
+        app.config.set_event_song("away_goal", "Warmups")
+        for _ in range(5):
+            app.play_event("away_goal", "Away Goal")
+        tracks = [p[2] for p in app.music.played[-5:]]
+        self.assertEqual(sorted(tracks), [1, 2, 3, 4, 5])
+        self.assertEqual(app.active_clip[1].end, 30)
+        # Power Play has no limit and clears the away cap.
+        app.config.set_event_song("power_play", "Warmups")
+        app.play_event("power_play", "Power Play")
+        self.assertIsNone(app.active_clip)
+
     def test_rows_show_track_length(self):
         self.pump()
         self.assertIn("(3:20)", self.app.listbox.get(0))

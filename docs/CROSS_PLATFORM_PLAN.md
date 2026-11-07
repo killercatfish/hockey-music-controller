@@ -68,7 +68,20 @@ ducking). Capacitor wraps the same code into App Store / Play Store builds later
 | **Apple Music (MusicKit)** | Primary. Each user needs their own Apple Music subscription; Josh needs the Apple Developer Program ($99/yr) for the MusicKit token. Streams, so it needs rink wifi/cell. |
 | **Local files** | Must-have second source. Works everywhere, offline, no subscription. User uploads MP3s/M4As once; cached on device. |
 | **Spotify** | **Not viable for a shared app.** Since Feb/Mar 2026 Spotify Development Mode is Premium-only, one Client ID per developer, max **5 authorized users**; wider access needs Extended Quota, which reportedly requires a registered business and ~250k MAU. Fine for Josh alone, dead end for distribution. |
-| YouTube etc. | No usable playback API for this. |
+| **TIDAL** | Plausible later. Has official Player SDKs for web, iOS and Android (open source, OAuth per user). At the 2024 launch, web playback was **preview clips only**; full-track access for third parties is unverified. Small US user base among hockey parents. |
+| **Amazon Music** | Not available. No public SDK; Web API playback needs Amazon's approval, Widevine DRM and certification. Their old device API is closed to new apps. |
+| **YouTube Music** | No playback API at all. |
+
+**"Connect your own account" is the model already.** MusicKit signs in each
+user to their own Apple Music subscription. The limits above are on *the app*
+(Josh's developer registration), not the user, so a user's own login doesn't
+get around Spotify's 5-user cap. Spotify also allows one Development Mode
+Client ID per developer, so "each user registers their own Spotify app" is the
+only workaround, and it's clunky and in a grey area under Spotify's terms.
+
+Build the player as a `MusicPlayer` interface (play-at, seek, volume, now
+playing) so each service is one adapter: Apple + local files at launch, TIDAL if
+full-track access checks out, Spotify if their rules ever reopen.
 
 **Licensing — say it out loud before charging money:** Apple's media terms
 limit Apple Music to personal, noncommercial use, and music played to a crowd is

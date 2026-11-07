@@ -71,6 +71,26 @@ ducking). Capacitor wraps the same code into App Store / Play Store builds later
 | **TIDAL** | Plausible later. Has official Player SDKs for web, iOS and Android (open source, OAuth per user). At the 2024 launch, web playback was **preview clips only**; full-track access for third parties is unverified. Small US user base among hockey parents. |
 | **Amazon Music** | Not available. No public SDK; Web API playback needs Amazon's approval, Widevine DRM and certification. Their old device API is closed to new apps. |
 | **YouTube Music** | No playback API at all. |
+| **YouTube (regular embedded player)** | Real third option. The IFrame Player API plays a given video, seeks, and sets volume, on every platform. Catches: ads unless the user is signed into YouTube Premium in that browser; the player must stay visible (no background audio-only); music videos can have intros, so clip points are per video. |
+| **Spotify desktop app (local control)** | Mac: Spotify's AppleScript dictionary plays a track URI, seeks and sets volume, so it can work the way Music.app does today. Windows: system media controls (SMTC) can play/pause/skip/seek what's playing; starting an exact track means opening a `spotify:` URI. Untested. iPhone: impossible. Android: partial and unreliable. |
+
+Coverage today, all **untested**:
+
+| | Mac | PC | iPhone | Android |
+|---|---|---|---|---|
+| Apple Music | yes | yes | yes | yes |
+| Own files | yes | yes | yes | yes |
+| YouTube (Premium) | yes | yes | yes | yes |
+| Spotify desktop | yes | maybe | no | no |
+| TIDAL | maybe | maybe | maybe | maybe |
+
+**iPhone volume risk.** iOS Safari ignores a web page's attempts to set a media
+element's volume (it always reads 1.0); the hardware buttons own it. Fades and
+ducking for Apple Music and YouTube may therefore be impossible from a web page
+on iPhone. Local files can still fade through Web Audio. Native iOS can duck
+other audio while an announcement plays (`AVAudioSession` `.duckOthers`), but
+native MusicKit has no app-controlled volume either. The fallback is pause instead
+of fade. `docs/spike/` tests exactly this.
 
 **"Connect your own account" is the model already.** MusicKit signs in each
 user to their own Apple Music subscription. The limits above are on *the app*
@@ -108,7 +128,8 @@ the product useful regardless.
 
 ## 5. Phases
 
-**Phase 0 — spike, 1–2 weekends. Go/no-go gate.** A throwaway web page that:
+**Phase 0 — spike, 1–2 weekends. Go/no-go gate.** Built: `docs/spike/index.html`
+(how to run it: `docs/spike/README.md`). A throwaway web page that:
 signs into Apple Music via MusicKit JS; plays a track starting at a clip point;
 fades out; ducks the music under an announcement MP3 and restores it.
 Test it on iPhone Safari, Android Chrome, Windows Chrome, Mac Safari.

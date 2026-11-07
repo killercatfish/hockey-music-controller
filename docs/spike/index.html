@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Rink Audio Spike</title>
+<style>
+  :root { --bg:#0e1420; --card:#18212f; --ink:#e8edf5; --dim:#93a0b4; --line:#2a3546;
+          --go:#2e9d5b; --warn:#c98a1c; --bad:#c94444; --btn:#2b5fb8; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         padding: 12px 16px calc(24px + env(safe-area-inset-bottom)); }
+  h1 { font-size:20px; margin:4px 0 2px; }
+  p.sub { color:var(--dim); margin:0 0 12px; font-size:14px; }
+  details { background:var(--card); border:1px solid var(--line); border-radius:10px;
+            margin:0 0 12px; padding:10px 12px; }
+  summary { font-weight:600; cursor:pointer; }
+  label { display:block; font-size:13px; color:var(--dim); margin:10px 0 3px; }
+  input[type=text], input[type=number], textarea, select {
+    width:100%; padding:9px; border-radius:7px; border:1px solid var(--line);
+    background:#0b111b; color:var(--ink); font-size:16px; }
+  textarea { min-height:60px; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  button { background:var(--btn); color:#fff; border:0; border-radius:8px;
+           padding:11px 14px; font-size:15px; font-weight:600; }
+  button.alt { background:#3a4659; }
+  button:disabled { opacity:.45; }
+  .status { font-size:13px; color:var(--dim); margin-top:8px; min-height:1.2em; }
+  #yt-wrap { margin-top:10px; aspect-ratio:16/9; width:100%; max-width:420px; }
+  #yt-wrap iframe { width:100%; height:100%; }
+  #results { background:#0b111b; border:1px solid var(--line); border-radius:8px;
+             padding:8px; font:12px/1.45 ui-monospace, Menlo, monospace;
+             white-space:pre-wrap; max-height:45vh; overflow:auto; }
+  .pass { color:#6fd39a; } .fail { color:#ff8a8a; } .info { color:var(--dim); }
+</style>
+</head>
+<body>
+<h1>Rink Audio Spike</h1>
+<p class="sub">Phase 0 test: can a web page do the game-day basics on this device?
+Play from a clip point, fade out, and duck under an announcement. Each test writes
+PASS/FAIL below. Tap <b>Copy results</b> when done and send them over.</p>
+
+<details open>
+  <summary>Announcement (used by every “Duck” test)</summary>
+  <label for="ann-text">Spoken with the device voice</label>
+  <input type="text" id="ann-text" value="Patriots goal! Scored by number nine!">
+  <label for="ann-file">…or an audio file (e.g. a cached Hume line) — optional</label>
+  <input type="file" id="ann-file" accept="audio/*">
+  <div class="row"><button class="alt" id="ann-test">Play announcement alone</button></div>
+</details>
+
+<details>
+  <summary>1 · Own file (local MP3/M4A)</summary>
+  <label for="loc-file">Pick a song from Files</label>
+  <input type="file" id="loc-file" accept="audio/*">
+  <label for="loc-start">Clip start (seconds)</label>
+  <input type="number" id="loc-start" value="30" inputmode="decimal">
+  <div class="row">
+    <button data-src="local" data-act="play">Play at clip</button>
+    <button data-src="local" data-act="fade">Fade out 3s</button>
+    <button data-src="local" data-act="duck">Duck + announce</button>
+    <button class="alt" data-src="local" data-act="stop">Stop</button>
+  </div>
+  <div class="status" id="local-status"></div>
+</details>
+
+<details>
+  <summary>2 · Apple Music (MusicKit JS)</summary>
+  <label for="am-token">MusicKit developer token (stays on this device only)</label>
+  <textarea id="am-token" placeholder="eyJhbGciOiJFUzI1NiIs…  — see README for how to make one"></textarea>
+  <div class="row">
+    <button id="am-auth">Load + sign in to Apple Music</button>
+  </div>
+  <label for="am-q">Search song</label>
+  <input type="text" id="am-q" value="Song 2 Blur">
+  <div class="row"><button class="alt" id="am-search">Search</button></div>
+  <label for="am-song">Result</label>
+  <select id="am-song"><option value="">— search first —</option></select>
+  <label for="am-start">Clip start (seconds)</label>
+  <input type="number" id="am-start" value="30" inputmode="decimal">
+  <div class="row">
+    <button data-src="apple" data-act="play">Play at clip</button>
+    <button data-src="apple" data-act="fade">Fade out 3s</button>
+    <button data-src="apple" data-act="duck">Duck + announce</button>
+    <button class="alt" data-src="apple" data-act="stop">Stop</button>
+  </div>
+  <div class="status" id="apple-status"></div>
+</details>
+
+<details>
+  <summary>3 · YouTube (embedded player)</summary>
+  <label for="yt-id">Video URL or ID</label>
+  <input type="text" id="yt-id" placeholder="paste a YouTube link to a song">
+  <label for="yt-start">Clip start (seconds)</label>
+  <input type="number" id="yt-start" value="30" inputmode="decimal">
+  <div class="row">
+    <button id="yt-load" class="alt">Load player</button>
+    <button data-src="youtube" data-act="play">Play at clip</button>
+    <button data-src="youtube" data-act="fade">Fade out 3s</button>
+    <button data-src="youtube" data-act="duck">Duck + announce</button>
+    <button class="alt" data-src="youtube" data-act="stop">Stop</button>
+  </div>
+  <div id="yt-wrap"><div id="yt"></div></div>
+  <div class="status" id="youtube-status"></div>
+</details>
+
+<div class="row" style="margin-bottom:8px">
+  <button id="copy">Copy results</button>
+  <button class="alt" id="clear">Clear</button>
+</div>
+<div id="results"></div>
+
+<script>
+"use strict";
+// ---------- results log ----------
+const out = document.getElementById("results");
+const lines = [];
+function log(kind, msg) {
+  const t = new Date().toLocaleTimeString();
+  lines.push(`[${t}] ${kind.toUpperCase()} ${msg}`);
+  const div = document.createElement("div");
+  div.className = kind; div.textContent = `[${t}] ${kind === "info" ? "" : kind.toUpperCase() + " "}${msg}`;
+  out.appendChild(div); out.scrollTop = out.scrollHeight;
+}
+const pass = m => log("pass", m), fail = m => log("fail", m), info = m => log("info", m);
+info(`Device: ${navigator.userAgent}`);
+info(`Secure context: ${window.isSecureContext}  standalone: ${!!navigator.standalone}`);
+
+document.getElementById("copy").onclick = async () => {
+  const text = lines.join("\n");
+  try { await navigator.clipboard.writeText(text); info("Copied to clipboard."); }
+  catch (e) { // older iOS fallback
+    const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta);
+    ta.select(); document.execCommand("copy"); ta.remove(); info("Copied (fallback).");
+  }
+};
+document.getElementById("clear").onclick = () => { lines.length = 0; out.textContent = ""; };
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const num = id => parseFloat(document.getElementById(id).value) || 0;
+const status = (src, msg) => { document.getElementById(src + "-status").textContent = msg; };
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+};
+
+// ---------- announcement ----------
+let annUrl = null;
+document.getElementById("ann-file").onchange = e => {
+  const f = e.target.files[0]; if (annUrl) URL.revokeObjectURL(annUrl);
+  annUrl = f ? URL.createObjectURL(f) : null;
+  if (f) info(`Announcement file: ${f.name}`);
+};
+function announce() {
+  return new Promise(resolve => {
+    if (annUrl) {
+      const a = new Audio(annUrl);
+      a.onended = () => resolve(true); a.onerror = () => resolve(false);
+      a.play().catch(err => { fail(`Announcement file play: ${err.message}`); resolve(false); });
+      return;
+    }
+    if (!("speechSynthesis" in window)) { fail("No speechSynthesis on this browser"); return resolve(false); }
+    const u = new SpeechSynthesisUtterance(document.getElementById("ann-text").value);
+    u.onend = () => resolve(true);
+    u.onerror = ev => { fail(`Speech error: ${ev.error}`); resolve(false); };
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+    setTimeout(() => resolve(true), 15000); // safety
+  });
+}
+document.getElementById("ann-test").onclick = async () => {
+  const t0 = performance.now(); const ok = await announce();
+  (ok ? pass : fail)(`Announcement alone (${((performance.now() - t0) / 1000).toFixed(1)}s)`);
+};
+
+// ---------- player adapters: each has play(start), getPos(), setVol(0..1), getVol(), stop() ----------
+const players = {};
+
+// 1. Local file: <audio> routed through a Web Audio GainNode (the way iOS allows volume control)
+(function () {
+  const el = new Audio(); el.preload = "auto"; el.playsInline = true;
+  let ctx = null, gain = null, url = null;
+  document.getElementById("loc-file").onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    if (url) URL.revokeObjectURL(url); url = URL.createObjectURL(f); el.src = url;
+    info(`Local file: ${f.name}`);
+  };
+  function ensureGraph() {
+    if (ctx) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    ctx = new AC(); gain = ctx.createGain();
+    ctx.createMediaElementSource(el).connect(gain); gain.connect(ctx.destination);
+  }
+  players.local = {
+    ready: () => !!el.src,
+    async play(start) {
+      ensureGraph(); if (ctx.state !== "running") await ctx.resume();
+      gain.gain.value = 0;                  // hold silent until the seek lands
+      await el.play();
+      el.currentTime = start;
+      await sleep(150);
+      gain.gain.value = 1;
+    },
+    getPos: () => el.currentTime,
+    setVol(v) { if (gain) gain.gain.value = v; },
+    getVol: () => gain ? gain.gain.value : 1,
+    elementVolumeLocked() { el.volume = 0.5; const r = el.volume; el.volume = 1; return r !== 0.5; },
+    stop() { el.pause(); },
+  };
+})();
+
+// 2. Apple Music
+(function () {
+  let mk = null;
+  const tokenBox = document.getElementById("am-token");
+  tokenBox.value = store.get("mk-token") || "";
+  function loadScript() {
+    return new Promise((resolve, reject) => {
+      if (window.MusicKit) return resolve();
+      document.addEventListener("musickitloaded", () => resolve(), { once: true });
+      const s = document.createElement("script");
+      s.src = "https://js-cdn.music.apple.com/musickit/v3/musickit.js";
+      s.async = true; s.onerror = () => reject(new Error("MusicKit script failed to load"));
+      document.head.appendChild(s);
+    });
+  }
+  document.getElementById("am-auth").onclick = async () => {
+    const token = tokenBox.value.trim();
+    if (!token) return fail("Apple Music: paste a developer token first");
+    store.set("mk-token", token);
+    try {
+      status("apple", "Loading MusicKit…");
+      await loadScript();
+      mk = await MusicKit.configure({ developerToken: token, app: { name: "Rink Audio Spike", build: "0.1" } });
+      pass("MusicKit configured");
+      await mk.authorize();
+      pass(`Signed in to Apple Music (storefront ${mk.storefrontId || "?"})`);
+      status("apple", "Signed in.");
+    } catch (e) { fail(`Apple Music sign-in: ${e && (e.message || e.errorCode || e)}`); status("apple", "Failed."); }
+  };
+  document.getElementById("am-search").onclick = async () => {
+    if (!mk) return fail("Apple Music: sign in first");
+    try {
+      const term = document.getElementById("am-q").value;
+      const res = await mk.api.music("/v1/catalog/{{storefrontId}}/search", { term, types: "songs", limit: 8 });
+      const songs = (res.data.results.songs || {}).data || [];
+      const sel = document.getElementById("am-song"); sel.innerHTML = "";
+      songs.forEach(s => {
+        const o = document.createElement("option"); o.value = s.id;
+        o.textContent = `${s.attributes.name} — ${s.attributes.artistName}`; sel.appendChild(o);
+      });
+      (songs.length ? pass : fail)(`Apple Music search "${term}": ${songs.length} results`);
+    } catch (e) { fail(`Apple Music search: ${e && (e.message || e)}`); }
+  };
+  players.apple = {
+    ready: () => !!mk && !!document.getElementById("am-song").value,
+    async play(start) {
+      const id = document.getElementById("am-song").value;
+      try { mk.volume = 0; } catch (e) {}
+      await mk.setQueue({ song: id, startPlaying: false });
+      await mk.play();
+      for (let i = 0; i < 40 && !mk.nowPlayingItem; i++) await sleep(50);
+      await mk.seekToTime(start);
+      try { mk.volume = 1; } catch (e) {}
+    },
+    getPos: () => mk.currentPlaybackTime,
+    setVol(v) { mk.volume = v; },
+    getVol: () => mk.volume,
+    stop() { mk.stop(); },
+  };
+})();
+
+// 3. YouTube IFrame API
+(function () {
+  let yt = null, apiReady = null;
+  function loadApi() {
+    if (apiReady) return apiReady;
+    apiReady = new Promise(resolve => {
+      window.onYouTubeIframeAPIReady = resolve;
+      const s = document.createElement("script"); s.src = "https://www.youtube.com/iframe_api";
+      document.head.appendChild(s);
+    });
+    return apiReady;
+  }
+  function videoId(text) {
+    const m = text.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{11})/); return m ? m[1] : text.trim();
+  }
+  document.getElementById("yt-load").onclick = async () => {
+    await loadApi();
+    const id = videoId(document.getElementById("yt-id").value);
+    if (yt) { yt.cueVideoById(id); pass(`YouTube cued ${id}`); return; }
+    yt = new YT.Player("yt", {
+      videoId: id, playerVars: { playsinline: 1, rel: 0 },
+      events: {
+        onReady: () => pass(`YouTube player ready (${id})`),
+        onError: e => fail(`YouTube error code ${e.data} (101/150 = owner blocks embedding)`),
+      },
+    });
+  };
+  players.youtube = {
+    ready: () => !!yt && typeof yt.playVideo === "function",
+    async play(start) {
+      yt.setVolume(0); yt.seekTo(start, true); yt.playVideo();
+      for (let i = 0; i < 60 && yt.getPlayerState() !== 1; i++) await sleep(50);
+      yt.setVolume(100);
+    },
+    getPos: () => yt.getCurrentTime(),
+    setVol(v) { yt.setVolume(Math.round(v * 100)); },
+    getVol: () => yt.getVolume() / 100,
+    stop() { yt.pauseVideo(); },
+  };
+})();
+
+// ---------- the three tests, same for every source ----------
+async function fade(p, seconds, to = 0) {
+  const from = p.getVol(), steps = 20;
+  for (let i = 1; i <= steps; i++) { p.setVol(from + (to - from) * i / steps); await sleep(seconds * 1000 / steps); }
+}
+// Returns true if the player really changed volume, judged by reading it back.
+function volumeSticks(p) {
+  const before = p.getVol(); p.setVol(0.5); const got = p.getVol(); p.setVol(before);
+  return Math.abs(got - 0.5) < 0.02;
+}
+
+const tests = {
+  async play(name, p, start) {
+    const t0 = performance.now();
+    await p.play(start);
+    await sleep(600);
+    const pos = p.getPos(), ms = Math.round(performance.now() - t0);
+    const ok = pos >= start - 0.5 && pos <= start + 3;
+    (ok ? pass : fail)(`${name} play-at-clip: asked ${start}s, at ${pos.toFixed(2)}s after ${ms}ms`);
+    info(`${name}: did you hear the intro before the jump? (listen, note it with the results)`);
+  },
+  async fade(name, p) {
+    if (!volumeSticks(p)) {
+      fail(`${name} fade: player volume does not change on this device (read back stays put) — fades/ducking impossible here`);
+      if (p.elementVolumeLocked && p.elementVolumeLocked()) info(`${name}: plain <audio>.volume is locked too (normal on iOS)`);
+      return;
+    }
+    await fade(p, 3, 0); p.stop(); p.setVol(1);
+    pass(`${name} fade: volume reached 0 by read-back — confirm by ear it faded smoothly, not cut`);
+  },
+  async duck(name, p) {
+    const canVol = volumeSticks(p);
+    if (canVol) await fade(p, 0.4, 0.25); else { info(`${name} duck: volume locked, pausing instead`); p.stop(); }
+    const t0 = performance.now(); const ok = await announce();
+    const secs = ((performance.now() - t0) / 1000).toFixed(1);
+    if (canVol) await fade(p, 0.8, 1);
+    const posAfter = p.getPos();
+    (ok ? pass : fail)(`${name} duck: announcement ${ok ? "played" : "failed"} (${secs}s), music ${canVol ? "ducked + restored" : "paused (no duck)"}, pos ${posAfter.toFixed(1)}s`);
+    info(`${name}: by ear — was the announcement clearly audible over the music? did the music stop by itself?`);
+  },
+  async stop(name, p) { p.stop(); info(`${name} stopped`); },
+};
+
+const NAMES = { local: "OWN FILE", apple: "APPLE MUSIC", youtube: "YOUTUBE" };
+const STARTS = { local: "loc-start", apple: "am-start", youtube: "yt-start" };
+document.querySelectorAll("button[data-src]").forEach(btn => {
+  btn.onclick = async () => {
+    const src = btn.dataset.src, act = btn.dataset.act, p = players[src], name = NAMES[src];
+    if (!p.ready()) return fail(`${name}: not loaded yet`);
+    btn.disabled = true; status(src, `Running ${act}…`);
+    try { await tests[act](name, p, num(STARTS[src])); }
+    catch (e) { fail(`${name} ${act}: ${e && (e.message || e)}`); }
+    finally { btn.disabled = false; status(src, ""); }
+  };
+});
+</script>
+</body>
+</html>

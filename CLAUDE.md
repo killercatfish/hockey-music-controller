@@ -205,8 +205,9 @@ one-tap situational cues (Pink Panther, Jeopardy, etc.) as too much to manage.
 plays the next track of a shuffled organ playlist. **Since 2026-11-08 there is no time
 cap** (Josh: the gap between goal and faceoff can run long, replacing the 30 s cap he
 first asked for): a song plays out, then Music moves to the next song in the playlist
-until someone stops it. Hit the Road Jack (32 s) replays once (`AWAY_GOAL_LOOP_ONCE` in
-main_window.py).
+until someone stops it. `AWAY_GOAL_LOOP_ONCE` in main_window.py replays the 32 s Hit the
+Road Jack once, but Josh swapped that track for a 2:41 version the same day, so it matches
+nothing today; safe to remove.
 
 **Rotating events start in one script (2026-11-08).** Josh asked for the organ to start
 quicker. A press used to make four `osascript` trips before any sound (volume, exists, count,

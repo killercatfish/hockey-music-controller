@@ -8,7 +8,7 @@ from .. import announcements, paths
 from ..announcer import Announcer
 from ..config import Config, EVENT_KEYS
 from ..music import AppleMusicController
-from ..playlists import Clip, EventDeck, PoolSet, format_seconds
+from ..playlists import EventDeck, PoolSet, format_seconds
 from ..roster import Roster
 from . import common
 from .dialogs import ClipDialog, FinalScoreDialog, PrerenderDialog, SettingsDialog
@@ -18,8 +18,9 @@ from .roster_editor import RosterEditor
 TICK_MS = 700
 # Events whose playlist rotates a song per press instead of playing from the top.
 ROTATING_EVENTS = ("power_play", "penalty_kill", "away_goal")
-# Rotating events that stop on their own after this many seconds (the fade lands on it).
-EVENT_MAX_SECONDS = {"away_goal": 30}
+# Away Goal songs too short to fill a stoppage: title -> position (seconds) at which
+# to jump back to the start, once per press. Must be at least two polls before the end.
+AWAY_GOAL_LOOP_ONCE = {"Hit the Road Jack (Chicago Bulls Stadium Organ Version)": 30.5}
 
 
 class HockeyMusicApp:
@@ -54,6 +55,7 @@ class HockeyMusicApp:
         self._stop_token = 0
         self._event_decks = {}       # event key -> EventDeck, for ROTATING_EVENTS
         self._event_sizes = {}       # playlist -> track count, so a press needn't ask
+        self._loop_armed = False     # an Away Goal press hasn't used its one loop yet
 
         self._build()
         self._bind_shortcuts()
@@ -683,9 +685,7 @@ class HockeyMusicApp:
         if played and rotating:
             self._learn_event_sizes_soon([song])  # catches tracks added or removed
         if played:
-            limit = EVENT_MAX_SECONDS.get(key)
-            if limit:                   # _tick fades it out at the limit
-                self.active_clip = (song, Clip(start=0, end=limit))
+            self._loop_armed = key == "away_goal"
             self.status_var.set(f"{label}: {song}")
         else:
             messagebox.showerror("Error", f"Could not play “{song}”. "
@@ -819,7 +819,23 @@ class HockeyMusicApp:
         if current is not None:      # None means Music was busy; keep the last value
             self.now_playing_var.set(f"♪  {current}")
         self._check_clip_end()
+        self._check_away_goal_loop(current)
         self.root.after(TICK_MS, self._tick)
+
+    def _check_away_goal_loop(self, current):
+        """Replay a short Away Goal song once. A missed poll just means the
+        song ends and Music moves on to the next one in the playlist."""
+        if not self._loop_armed or not current:
+            return
+        loop_at = next((at for title, at in AWAY_GOAL_LOOP_ONCE.items()
+                        if current.startswith(f"{title} - ")), None)
+        if loop_at is None:
+            return
+        position = self.music.get_player_position()
+        if position is None or position < loop_at:
+            return
+        self._loop_armed = False
+        threading.Thread(target=self.music.restart_track, daemon=True).start()
 
     def _check_clip_end(self):
         if not self.active_clip:

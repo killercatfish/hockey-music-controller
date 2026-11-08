@@ -5,6 +5,7 @@ here rather than at the rink. Run: python3 tests/test_ui_smoke.py
 
 import sys
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 
@@ -13,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import tkinter as tk
 
 from hockeymusic import paths
+from hockeymusic.ui import main_window
 
 
 class FakeMusic:
@@ -262,18 +264,42 @@ class TestMainWindow(UITestCase):
         app.play_event("power_play", "Power Play")
         self.assertEqual(app.music.played[-1], ("Some Track", None))
 
-    def test_away_goal_rotates_and_stops_at_30_seconds(self):
+    def test_away_goal_rotates_and_plays_out(self):
         app = self.app
         app.config.set_event_song("away_goal", "Warmups")
         for _ in range(5):
             app.play_event("away_goal", "Away Goal")
         tracks = [p[2] for p in app.music.played[-5:]]
         self.assertEqual(sorted(tracks), [1, 2, 3, 4, 5])
-        self.assertEqual(app.active_clip[1].end, 30)
-        # Power Play has no limit and clears the away cap.
-        app.config.set_event_song("power_play", "Warmups")
-        app.play_event("power_play", "Power Play")
         self.assertIsNone(app.active_clip)
+
+    def test_short_away_goal_song_loops_once(self):
+        app = self.app
+        title = next(iter(main_window.AWAY_GOAL_LOOP_ONCE))
+        now = f"{title} - Da Stadium Organist"
+        restarted = threading.Event()
+        app.music.restart_track = restarted.set
+        app.config.set_event_song("away_goal", "Warmups")
+        app.play_event("away_goal", "Away Goal")
+
+        app.music.get_player_position = lambda: 12.0     # too early
+        app._check_away_goal_loop(now)
+        self.assertFalse(restarted.is_set())
+
+        app.music.get_player_position = lambda: 31.0
+        app._check_away_goal_loop("Some Other Song - Artist")   # wrong song
+        self.assertFalse(restarted.is_set())
+        app._check_away_goal_loop(now)
+        self.assertTrue(restarted.wait(1))
+
+        restarted.clear()                                # only once per press
+        app._check_away_goal_loop(now)
+        self.assertFalse(restarted.wait(0.05))
+
+        app.config.set_event_song("power_play", "Warmups")   # other events never loop
+        app.play_event("power_play", "Power Play")
+        app._check_away_goal_loop(now)
+        self.assertFalse(restarted.wait(0.05))
 
     def test_rotating_event_with_known_size_goes_straight_to_play(self):
         app = self.app
@@ -286,7 +312,6 @@ class TestMainWindow(UITestCase):
         app.play_event("away_goal", "Away Goal")
         self.assertEqual(calls, [])
         self.assertEqual(app.music.last_play_volume, app.music.base_volume)
-        self.assertEqual(app.active_clip[1].end, 30)
 
     def test_rotating_event_recovers_when_known_size_is_stale(self):
         app = self.app

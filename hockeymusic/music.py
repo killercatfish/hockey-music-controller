@@ -308,6 +308,10 @@ class AppleMusicController:
     def next_track(self):
         return self._run('tell application "Music" to next track')[1]
 
+    def restart_track(self):
+        """Jump back to the start of the song that is already playing."""
+        return self._run('tell application "Music" to set player position to 0')[1]
+
     # -- state ------------------------------------------------------------
 
     def get_current_track(self):

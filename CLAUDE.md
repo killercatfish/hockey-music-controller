@@ -25,7 +25,7 @@ bash launch.sh                    # checks deps, opens Music, launches
 python3 hockey_music_controller.py
 
 python3 tests/test_core.py        # 59 tests: copy, roster, playlists, event rotation, migration, clip sharing, recorded voice, Hume shutdown
-python3 tests/test_ui_smoke.py    # 33 tests: builds every window
+python3 tests/test_ui_smoke.py    # 34 tests: builds every window
 python3 tests/test_hype.py        # 20 tests: chorus detection, proposal apply, game-deck split
 
 python3 hype_points.py propose|show|apply|revert   # clip starts at the chorus (docs/HYPE_POINTS.md)
@@ -202,8 +202,11 @@ Josh uses only these two situational buttons; he declined a wider set of
 one-tap situational cues (Pink Panther, Jeopardy, etc.) as too much to manage.
 
 **Away Goal button (2026-11-02).** A third rotating event, `away_goal` (purple button, key V),
-plays the next track of a shuffled organ playlist and fades out at 30 seconds
-(`EVENT_MAX_SECONDS` in main_window.py). Josh asked for organ stings, max 30 s.
+plays the next track of a shuffled organ playlist. **Since 2026-11-08 there is no time
+cap** (Josh: the gap between goal and faceoff can run long, replacing the 30 s cap he
+first asked for): a song plays out, then Music moves to the next song in the playlist
+until someone stops it. Hit the Road Jack (32 s) replays once (`AWAY_GOAL_LOOP_ONCE` in
+main_window.py).
 
 **Rotating events start in one script (2026-11-08).** Josh asked for the organ to start
 quicker. A press used to make four `osascript` trips before any sound (volume, exists, count,

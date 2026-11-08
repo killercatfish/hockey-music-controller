@@ -30,11 +30,12 @@ class FakeMusic:
     def playlist_exists(self, name):
         return name in self.get_playlists()
 
-    def playlist_track_count(self, name):
-        return 5 if self.playlist_exists(name) else 0
+    def playlist_track_count(self, name, quiet=False):
+        return 5 if name in self.get_playlists() else 0
 
-    def play_playlist(self, name, track=1):
+    def play_playlist(self, name, track=1, volume=None):
         self.played.append(("playlist", name, track))
+        self.last_play_volume = volume
         self.playing = True
         return True
 
@@ -273,6 +274,29 @@ class TestMainWindow(UITestCase):
         app.config.set_event_song("power_play", "Warmups")
         app.play_event("power_play", "Power Play")
         self.assertIsNone(app.active_clip)
+
+    def test_rotating_event_with_known_size_goes_straight_to_play(self):
+        app = self.app
+        app.config.set_event_song("away_goal", "Warmups")
+        app._learn_event_sizes(["Warmups"])
+        self.assertEqual(app._event_sizes["Warmups"], 5)
+        calls = []
+        app.music.playlist_exists = lambda name: calls.append("exists") or True
+        app.music.set_volume = lambda value: calls.append("volume") or True
+        app.play_event("away_goal", "Away Goal")
+        self.assertEqual(calls, [])
+        self.assertEqual(app.music.last_play_volume, app.music.base_volume)
+        self.assertEqual(app.active_clip[1].end, 30)
+
+    def test_rotating_event_recovers_when_known_size_is_stale(self):
+        app = self.app
+        app.config.set_event_song("away_goal", "Warmups")
+        app._event_sizes["Warmups"] = 99
+        real = app.music.play_playlist
+        app.music.play_playlist = lambda name, track=1, volume=None: (
+            False if volume is not None else real(name, track=track))
+        app.play_event("away_goal", "Away Goal")
+        self.assertLessEqual(app.music.played[-1][2], 5)
 
     def test_rows_show_track_length(self):
         self.pump()

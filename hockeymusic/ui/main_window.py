@@ -1,5 +1,6 @@
 """The game-day console."""
 
+import threading
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 
@@ -52,6 +53,7 @@ class HockeyMusicApp:
         self.volume_var = tk.IntVar(value=100)
         self._stop_token = 0
         self._event_decks = {}       # event key -> EventDeck, for ROTATING_EVENTS
+        self._event_sizes = {}       # playlist -> track count, so a press needn't ask
 
         self._build()
         self._bind_shortcuts()
@@ -61,6 +63,7 @@ class HockeyMusicApp:
                 self.load_pool_tracks(quiet=True)
             self.refresh_playlists(quiet=True)
             self._sync_volume()
+            self._learn_event_sizes_soon()
             self._tick()
 
     # -- convenience ------------------------------------------------------
@@ -664,11 +667,21 @@ class HockeyMusicApp:
         self.active_clip = None
         self._stop_token += 1           # cancel any pending fade backstop
         self.music.cancel_fades()
-        self.music.set_volume(self.music.base_volume)
-        if key in ROTATING_EVENTS and self.music.playlist_exists(song):
-            played = self._play_rotating(key, song)
-        else:
-            played = self.music.play_song_or_playlist(song)
+        rotating = key in ROTATING_EVENTS
+        size = self._event_sizes.get(song) if rotating else None
+        played = False
+        if size:                        # known size: one script, volume and play
+            played = self._play_rotating(key, song, size, volume=self.music.base_volume)
+        if not played:                  # first press, or the known size went stale
+            self._event_sizes.pop(song, None)
+            self.music.set_volume(self.music.base_volume)
+            if rotating and self.music.playlist_exists(song):
+                size = self.music.playlist_track_count(song)
+                played = bool(size) and self._play_rotating(key, song, size)
+            else:
+                played = self.music.play_song_or_playlist(song)
+        if played and rotating:
+            self._learn_event_sizes_soon([song])  # catches tracks added or removed
         if played:
             limit = EVENT_MAX_SECONDS.get(key)
             if limit:                   # _tick fades it out at the limit
@@ -678,15 +691,28 @@ class HockeyMusicApp:
             messagebox.showerror("Error", f"Could not play “{song}”. "
                                           "Check the exact title in Apple Music.")
 
-    def _play_rotating(self, key, playlist):
+    def _play_rotating(self, key, playlist, size, volume=None):
         """Play the next song from this event's shuffled deck of `playlist`."""
-        size = self.music.playlist_track_count(playlist)
-        if not size:
-            return False
         deck = self._event_decks.get(key)
         if not deck or deck.playlist != playlist or deck.size != size:
             deck = self._event_decks[key] = EventDeck(playlist, size)
-        return self.music.play_playlist(playlist, track=deck.next())
+        return self.music.play_playlist(playlist, track=deck.next(), volume=volume)
+
+    def _learn_event_sizes(self, songs):
+        """Ask Music how long each rotating playlist is. A name that isn't a
+        playlist counts as 0 and stays on the slower path that handles tracks."""
+        for song in songs:
+            size = self.music.playlist_track_count(song, quiet=True)
+            if size:
+                self._event_sizes[song] = size
+            else:
+                self._event_sizes.pop(song, None)
+
+    def _learn_event_sizes_soon(self, songs=None):
+        """Run `_learn_event_sizes` off the main loop (invariant 5)."""
+        if songs is None:
+            songs = [s for s in map(self.config.event_song, ROTATING_EVENTS) if s]
+        threading.Thread(target=self._learn_event_sizes, args=(songs,), daemon=True).start()
 
     def play_goal_song(self, player=None):
         """Play the scorer's own goal song, falling back to the team's."""
@@ -781,6 +807,7 @@ class HockeyMusicApp:
 
     def apply_settings(self):
         """Re-read settings that change how the list is filtered or displayed."""
+        self._learn_event_sizes_soon()
         self.pool.reset_order(family_safe=self.family_safe)
         self.position = 0
         self.refresh_playlist_view()

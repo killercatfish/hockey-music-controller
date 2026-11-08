@@ -238,22 +238,30 @@ class AppleMusicController:
             with self._vol_lock:
                 self._fading = False
 
-    def playlist_track_count(self, playlist_name):
+    def playlist_track_count(self, playlist_name, quiet=False):
+        """`quiet` is one silent attempt, for background checks that must not
+        hold the script lock through retries and delay the operator's next cue."""
+        options = {"max_retries": 1, "silent": True} if quiet else {}
         out, ok = self._run(
-            f'tell application "Music" to return count tracks of user playlist "{_escape(playlist_name)}"')
+            f'tell application "Music" to return count tracks of user playlist "{_escape(playlist_name)}"',
+            **options)
         return int(out) if ok and out.isdigit() else 0
 
-    def play_playlist(self, playlist_name, track=1):
+    def play_playlist(self, playlist_name, track=1, volume=None):
         """Play a whole user playlist from its first track (Zamboni set etc).
 
         `play user playlist` starts on a random track when Music's shuffle is
         on, so the Zamboni button could open on anything. Naming track 1 makes
         the first song play first regardless; Music's shuffle setting is left
         alone and still applies to what follows. `track` picks another start
-        (the Power Play / Penalty Kill rotation).
+        (the Power Play / Penalty Kill rotation). `volume` is set in the same
+        script as the play, saving a whole osascript launch before the sound.
         """
-        return self._run(f'tell application "Music" to play track {int(track)} of user playlist '
-                         f'"{_escape(playlist_name)}"')[1]
+        play = f'play track {int(track)} of user playlist "{_escape(playlist_name)}"'
+        if volume is None:
+            return self._run(f'tell application "Music" to {play}')[1]
+        level = max(0, min(100, int(volume)))
+        return self._run(f'tell application "Music"\nset sound volume to {level}\n{play}\nend tell')[1]
 
     def play_song_or_playlist(self, name):
         """An event song may name a track OR a playlist. A playlist plays through

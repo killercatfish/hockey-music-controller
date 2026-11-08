@@ -25,7 +25,7 @@ bash launch.sh                    # checks deps, opens Music, launches
 python3 hockey_music_controller.py
 
 python3 tests/test_core.py        # 59 tests: copy, roster, playlists, event rotation, migration, clip sharing, recorded voice, Hume shutdown
-python3 tests/test_ui_smoke.py    # 31 tests: builds every window
+python3 tests/test_ui_smoke.py    # 33 tests: builds every window
 python3 tests/test_hype.py        # 20 tests: chorus detection, proposal apply, game-deck split
 
 python3 hype_points.py propose|show|apply|revert   # clip starts at the chorus (docs/HYPE_POINTS.md)
@@ -204,6 +204,12 @@ one-tap situational cues (Pink Panther, Jeopardy, etc.) as too much to manage.
 **Away Goal button (2026-11-02).** A third rotating event, `away_goal` (purple button, key V),
 plays the next track of a shuffled organ playlist and fades out at 30 seconds
 (`EVENT_MAX_SECONDS` in main_window.py). Josh asked for organ stings, max 30 s.
+
+**Rotating events start in one script (2026-11-08).** Josh asked for the organ to start
+quicker. A press used to make four `osascript` trips before any sound (volume, exists, count,
+play). The app now learns each rotating playlist's size in the background (startup, Settings
+save, after each press), so a press sends volume + play as one script. Unknown or stale size
+falls back to the old path.
 
 **Hume cancelled (2026-10-22).** Josh cancelled the plan and deleted the Hume
 account. Every pre-render set was fully cached first (lineup, home pieces, away,

@@ -41,9 +41,14 @@ class FakeMusic:
         self.playing = True
         return True
 
+    def play_whole_playlist(self, name):
+        self.played.append(("whole playlist", name))
+        self.playing = True
+        return True
+
     def play_song_or_playlist(self, name):
         if self.playlist_exists(name):
-            return self.play_playlist(name)
+            return self.play_whole_playlist(name)
         return self.play_track_by_name(name)
 
     def get_playlist_tracks(self, _name):
@@ -248,7 +253,7 @@ class TestMainWindow(UITestCase):
         app = self.app
         app.config.set_event_song("zamboni", "Warmups")
         app.play_event("zamboni", "Zamboni")
-        self.assertEqual(app.music.played[-1], ("playlist", "Warmups", 1))
+        self.assertEqual(app.music.played[-1], ("whole playlist", "Warmups"))
         app.config.set_event_song("zamboni", "Some Track")
         app.play_event("zamboni", "Zamboni")
         self.assertEqual(app.music.played[-1], ("Some Track", None))
@@ -577,13 +582,13 @@ class TestDialogs(UITestCase):
                     yield child.cget("text")
                 yield from buttons(child)
 
-        dialog = SettingsDialog(self.app)
-        self.assertIn("Clear cache", list(buttons(dialog.win)))
-        dialog.win.destroy()
-
         original = Announcer.__dict__["hume_retired"]
-        Announcer.hume_retired = property(lambda self: True)
+        Announcer.hume_retired = property(lambda self: False)   # before the shutdown date
         try:
+            dialog = SettingsDialog(self.app)
+            self.assertIn("Clear cache", list(buttons(dialog.win)))
+            dialog.win.destroy()
+            Announcer.hume_retired = property(lambda self: True)
             dialog = SettingsDialog(self.app)
             self.assertNotIn("Clear cache", list(buttons(dialog.win)))
             dialog.win.destroy()

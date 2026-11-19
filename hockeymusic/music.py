@@ -248,14 +248,11 @@ class AppleMusicController:
         return int(out) if ok and out.isdigit() else 0
 
     def play_playlist(self, playlist_name, track=1, volume=None):
-        """Play a whole user playlist from its first track (Zamboni set etc).
+        """Start a playlist's song `track` (the Power Play / Penalty Kill rotation).
 
-        `play user playlist` starts on a random track when Music's shuffle is
-        on, so the Zamboni button could open on anything. Naming track 1 makes
-        the first song play first regardless; Music's shuffle setting is left
-        alone and still applies to what follows. `track` picks another start
-        (the Power Play / Penalty Kill rotation). `volume` is set in the same
-        script as the play, saving a whole osascript launch before the sound.
+        Naming a track can stop after that one song; a set that must play
+        through uses `play_whole_playlist`. `volume` is set in the same script
+        as the play, saving a whole osascript launch before the sound.
         """
         play = f'play track {int(track)} of user playlist "{_escape(playlist_name)}"'
         if volume is None:
@@ -263,12 +260,23 @@ class AppleMusicController:
         level = max(0, min(100, int(volume)))
         return self._run(f'tell application "Music"\nset sound volume to {level}\n{play}\nend tell')[1]
 
+    def play_whole_playlist(self, playlist_name):
+        """Play a user playlist top to bottom, in order (the Zamboni set).
+
+        `play track 1 of user playlist` played one song and stopped at the
+        rink (2026-11-08). Playing the playlist itself continues through it,
+        but opens on a random song if Music's shuffle is on, so shuffle goes
+        off first and stays off.
+        """
+        return self._run('tell application "Music"\nset shuffle enabled to false\n'
+                         f'play user playlist "{_escape(playlist_name)}"\nend tell')[1]
+
     def play_song_or_playlist(self, name):
         """An event song may name a track OR a playlist. A playlist plays through
         from the top; a track plays alone. Used by the event buttons and the
         Settings ▶ Test button so both agree."""
         if self.playlist_exists(name):
-            return self.play_playlist(name)
+            return self.play_whole_playlist(name)
         return self.play_track_by_name(name)
 
     def _seek_verified(self, seconds, attempts=20, settle=0.05):

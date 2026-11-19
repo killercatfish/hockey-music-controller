@@ -648,6 +648,39 @@ class TestPlayMutedSeek(unittest.TestCase):
         self.assertEqual(m.remember_base_volume(), 70)
 
 
+class TestPlayWholePlaylist(unittest.TestCase):
+    """The Zamboni set plays through in order; a named track still plays alone."""
+
+    def _controller(self, is_playlist):
+        from hockeymusic import music as mod
+        log = []
+        m = mod.AppleMusicController()
+        m.playlist_exists = lambda _name: is_playlist
+
+        def fake(script, **_kw):
+            log.append(script)
+            return "", True
+
+        saved = mod.run_applescript
+        mod.run_applescript = fake
+        self.addCleanup(setattr, mod, "run_applescript", saved)
+        return m, log
+
+    def test_playlist_plays_itself_with_shuffle_off(self):
+        m, log = self._controller(is_playlist=True)
+        self.assertTrue(m.play_song_or_playlist("Zamboni"))
+        self.assertEqual(len(log), 1)
+        self.assertIn('play user playlist "Zamboni"', log[0])
+        self.assertNotIn("play track", log[0])      # naming a track stopped after one song
+        self.assertLess(log[0].index("set shuffle enabled to false"),
+                        log[0].index("play user playlist"))
+
+    def test_track_name_plays_the_track(self):
+        m, log = self._controller(is_playlist=False)
+        self.assertTrue(m.play_song_or_playlist("Eruption"))
+        self.assertEqual(log, ['tell application "Music" to play track "Eruption"'])
+
+
 class TestHumeEnvFile(unittest.TestCase):
     """Settings writes Hume credentials to ~/.hockey_music/.env, merging."""
 

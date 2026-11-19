@@ -24,7 +24,7 @@ tkinter, Apple Music must be running. Currently developed on Python 3.14.
 bash launch.sh                    # checks deps, opens Music, launches
 python3 hockey_music_controller.py
 
-python3 tests/test_core.py        # 59 tests: copy, roster, playlists, event rotation, migration, clip sharing, recorded voice, Hume shutdown
+python3 tests/test_core.py        # 61 tests: copy, roster, playlists, event rotation, migration, clip sharing, recorded voice, Hume shutdown
 python3 tests/test_ui_smoke.py    # 34 tests: builds every window
 python3 tests/test_hype.py        # 20 tests: chorus detection, proposal apply, game-deck split
 
@@ -197,7 +197,8 @@ stops on the first one. Check the plan at platform.hume.ai before a big render.
 **Power Play / Penalty Kill rotate (2026-10-22).** When either event names a
 playlist, each press plays the next track of a shuffled deck (`EventDeck` in
 playlists.py), every track once before a repeat, never the same one twice running.
-Other events still play a named playlist from track 1 (the Zamboni set needs that).
+Other events that name a playlist play the playlist itself, with Music's shuffle turned off first
+(`play_whole_playlist`, 2026-11-19): asking for track 1 played one song and stopped at the rink on 11/08.
 Josh uses only these two situational buttons; he declined a wider set of
 one-tap situational cues (Pink Panther, Jeopardy, etc.) as too much to manage.
 
@@ -214,6 +215,13 @@ quicker. A press used to make four `osascript` trips before any sound (volume, e
 play). The app now learns each rotating playlist's size in the background (startup, Settings
 save, after each press), so a press sends volume + play as one script. Unknown or stale size
 falls back to the old path.
+
+**The Locate box freezes the app (found 2026-11-19).** A few library songs are iCloud-matched or
+uploaded copies with no file on this Mac (`cloud status` matched/uploaded, `location` missing).
+Asking Music to play one puts up "locate the file?" and the AppleScript call hangs until someone
+clicks Cancel; plays sent meanwhile fail silently. Streaming (subscription) tracks are fine, and so
+is the phone. Known on 11/19: Power Play tracks 3 and 7, Penalty Kill tracks 1 to 3, Oct 24 tracks
+38 and 57. The app has no guard yet. Don't test-play these; it raises the box.
 
 **Hume cancelled (2026-10-22).** Josh cancelled the plan and deleted the Hume
 account. Every pre-render set was fully cached first (lineup, home pieces, away,

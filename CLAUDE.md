@@ -220,8 +220,10 @@ falls back to the old path.
 uploaded copies with no file on this Mac (`cloud status` matched/uploaded, `location` missing).
 Asking Music to play one puts up "locate the file?" and the AppleScript call hangs until someone
 clicks Cancel; plays sent meanwhile fail silently. Streaming (subscription) tracks are fine, and so
-is the phone. Known on 11/19: Power Play tracks 3 and 7, Penalty Kill tracks 1 to 3, Oct 24 tracks
-38 and 57. The app has no guard yet. Don't test-play these; it raises the box.
+is the phone. The five in Power Play and Penalty Kill were swapped for streaming copies on 11/19 (I Fought
+the Law is now The Clash's: Green Day's only catalog copy maps back to the broken library entry).
+Still bad: Oct 24 tracks 38 and 57, and the library entries themselves. The app has no guard yet.
+Don't test-play these; it raises the box.
 
 **Hume cancelled (2026-10-22).** Josh cancelled the plan and deleted the Hume
 account. Every pre-render set was fully cached first (lineup, home pieces, away,
